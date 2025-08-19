@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Mesa Acústica</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f3ed; /* Soft cream background */
+            color: #333;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+        }
+        .container {
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+        .header-bg {
+            background-image: url('https://placehold.co/1200x400/2c2c2c/e0b97a?text=La+Mesa+Ac%C3%BAstica'); /* Placeholder for elegant background */
+            background-size: cover;
+            background-position: center;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: white;
+            position: relative;
+        }
+        .header-bg::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4); /* Dark overlay for text readability */
+        }
+        .header-content {
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%; /* Ensure content takes full height to center items */
+            padding: 1rem; /* Add some padding */
+        }
+        .header-content img {
+            width: auto;
+            max-width: 100%; /* Ensure it doesn't overflow container */
+            height: 180px; /* Fixed height for consistent sizing */
+            object-fit: contain; /* Ensure the image fits without cropping */
+            margin-bottom: 4rem; /* Increased space between logo and title */
+            display: block; /* Ensure it takes its own line for proper margin */
+        }
+        .navbar {
+            background-color: #2c2c2c; /* Dark charcoal */
+        }
+        .nav-link {
+            padding: 1rem 1.5rem;
+            color: #e0b97a; /* Gold/Copper accent */
+            transition: background-color 0.3s ease;
+            white-space: nowrap;
+        }
+        .nav-link:hover {
+            background-color: #3a3a3a;
+        }
+        .section {
+            padding: 2rem 1rem;
+            margin: 0 auto;
+            max-width: 900px;
+        }
+        .card {
+            background-color: #fff;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .btn-primary {
+            background-color: #e0b97a;
+            color: #2c2c2c;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+        .btn-primary:hover {
+            background-color: #c7a16b;
+        }
+        .input-field {
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            background-color: #fcfcfc;
+        }
+        .social-share-btn {
+            background-color: #2c2c2c;
+            color: #e0b97a;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s ease;
+        }
+        .social-share-btn:hover {
+            background-color: #3a3a3a;
+        }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.7); /* Black w/ opacity */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideInUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-fadeIn { animation: fadeIn 0.8s ease-out; }
+        .animate-slideInUp { animation: slideInUp 0.6s ease-out; }
+
+        .vote-option-btn {
+            background-color: #f0e6da; /* Lighter background for vote options */
+            color: #4a4a4a;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .vote-option-btn:hover {
+            background-color: #e7d8c6;
+            border-color: #e0b97a;
+        }
+        .vote-option-btn.selected {
+            background-color: #e0b97a;
+            color: #2c2c2c;
+            border-color: #2c2c2c;
+            transform: scale(1.02);
+        }
+
+        /* WhatsApp floating button */
+        .whatsapp-float {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #25d366; /* WhatsApp green */
+            color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        .whatsapp-float:hover {
+            transform: scale(1.1);
+            background-color: #128c7e;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .navbar-menu {
+                display: none;
+                flex-direction: column;
+                width: 100%;
+                background-color: #2c2c2c;
+                position: absolute;
+                top: 64px; /* Height of the navbar */
+                left: 0;
+                z-index: 50;
+            }
+            .navbar-menu.open {
+                display: flex;
+            }
+            .nav-link {
+                padding: 1rem;
+                text-align: center;
+                border-bottom: 1px solid #3a3a3a;
+            }
+            .hamburger {
+                display: block;
+            }
+            .header-bg {
+                height: 300px;
+            }
+            .header-content img {
+                width: auto;
+                height: 100px; /* Adjusted for smaller screens */
+                margin-bottom: 2rem; /* Adjusted for smaller screens */
+            }
+            .header-content h1 {
+                font-size: 2.5rem;
+            }
+            .header-content p {
+                font-size: 1rem;
+            }
+            .whatsapp-float {
+                width: 50px;
+                height: 50px;
+                font-size: 24px;
+                bottom: 15px;
+                right: 15px;
+            }
+        }
+        @media (min-width: 769px) {
+            .hamburger {
+                display: none;
+            }
+            .navbar-menu {
+                display: flex !important; /* Ensure it's always flex on larger screens */
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Navbar -->
+    <nav class="navbar p-4 flex justify-between items-center relative z-50">
+        <div class="text-xl font-bold text-white">La Mesa Acústica</div>
+        <button id="hamburger" class="text-white text-2xl focus:outline-none md:hidden">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div id="navbar-menu" class="navbar-menu md:flex md:items-center md:space-x-4">
+            <a href="#participa" class="nav-link">Participa ✨</a>
+            <a href="#musicos" class="nav-link">Músicos 🎻</a>
+            <a href="#eventos" class="nav-link">Boletos 🎟️</a>
+            <a href="#galeria" class="nav-link">Galería 📸</a>
+            <a href="#comentarios" class="nav-link">Comentarios 💬</a>
+            <a href="#restaurante" class="nav-link">Restaurante 🍽️</a>
+            <a href="#contacto" class="nav-link">Contacto 📞</a>
+            <button id="satisfactionBtn" class="nav-link">Encuesta de Satisfacción ✅</button>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <header class="header-bg relative">
+        <div class="header-content p-4 animate-fadeIn">
+            <!-- Logo del proyecto -->
+            <img src="https://i.ibb.co/vCCg9PWs/Gemini-Generated-Image-nrlxdinrlxdinrlx.png" alt="La Mesa Acústica Logo" class="mx-auto">
+            <h1 class="text-5xl font-extrabold mb-2 leading-tight">La Mesa Acústica</h1>
+            <p class="text-xl italic font-light">"Una experiencia gastronómica que se siente, se escucha y se vive."</p>
+        </div>
+    </header>
+
+    <!-- Participate Section -->
+    <section id="participa" class="section animate-slideInUp">
+        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Participa en el Concierto ✨</h2>
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h3 class="text-2xl font-semibold mb-4 text-gray-800">¡Vota por tu Pieza Favorita! 🎶</h3>
+            <p class="mb-4 text-gray-700">Tu voz cuenta. Ayúdanos a elegir la próxima melodía que tocará el ensamble esta noche.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <button class="vote-option-btn text-lg" data-vote="1">Vals de la Luz de Luna</button>
+                <button class="vote-option-btn text-lg" data-vote="2">Bolero Apasionado</button>
+                <button class="vote-option-btn text-lg" data-vote="3">Jazz Nocturno</button>
+                <button class="vote-option-btn text-lg" data-vote="4">Fantasía Celta</button>
+            </div>
+            <button id="submitVoteBtn" class="btn-primary w-full text-center">Enviar mi Voto</button>
+            <p id="voteMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Gracias por tu voto! 🎉</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+            <h3 class="text-2xl font-semibold mb-4 text-gray-800">Comparte tu Experiencia 💖</h3>
+            <p class="mb-4 text-gray-700">¿Cómo te hace sentir la música? ¿Qué emociones evoca? Comparte tus comentarios y experiencias relacionadas con la temática del concierto. (Tus comentarios se leerán anónimamente)</p>
+            <textarea id="commentInput" class="input-field mb-4 h-32" placeholder="Escribe tu comentario aquí..."></textarea>
+            <button id="submitCommentBtn" class="btn-primary w-full text-center">Enviar Comentario</button>
+            <p id="commentMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Comentario enviado! Gracias por compartir. ✨</p>
+            <div class="mt-6 flex justify-center space-x-4">
+                <button class="social-share-btn" onclick="shareOnSocial('facebook')"><i class="fab fa-facebook-f"></i></button>
+                <button class="social-share-btn" onclick="shareOnSocial('twitter')"><i class="fab fa-twitter"></i></button>
+                <button class="social-share-btn" onclick="shareOnSocial('instagram')"><i class="fab fa-instagram"></i></button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Musicians Section -->
+    <section id="musicos" class="section animate-slideInUp">
+        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Nuestros Músicos & Narradora 🎻</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Violinista -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/7JMYCWVw/414867486-10232565539508056-4641127466506244359-n.jpg" alt="Violinista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Ricardo "Rola" Martínez</h3>
+                <p class="text-gray-600 mb-4">Violinista principal y arreglista. Con su pasión, Rola teje melodías que tocan el alma, explorando desde lo clásico hasta lo contemporáneo. 🌟</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Ricardo Martínez', 'Violinista principal y arreglista.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+            <!-- Cantante -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/HpVvkyZ7/Caro.jpg" alt="Cantante" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Carolina "Caro" Solís</h3>
+                <p class="text-gray-600 mb-4">Cantante principal y narradora. Su voz, una mezcla de dulzura y poder, te guiará a través de cada historia. 🎤</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Carolina Solís', 'Cantante principal y narradora.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+            <!-- Pianista -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/tMzCC7dz/pianista.jpg" alt="Pianista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Fernando "Fer" García</h3>
+                <p class="text-gray-600 mb-4">Pianista y compositor. Las manos de Fer crean atmósferas mágicas que te sumergen en cada emoción. 🎹</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Fernando García', 'Pianista y compositor.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+            <!-- Saxofonista -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/0jBQBB0c/sax-azael.jpg" alt="Saxofonista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Antonio "Aza" Zazueta</h3>
+                <p class="text-gray-600 mb-4">Saxofonista principal. Con su sax, Aza añade un toque de sensualidad y sofisticación a cada pieza. 🎷</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Antonio Zazueta', 'Saxofonista principal.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+            <!-- Chelista -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/C5jHH4jy/marcello.jpg" alt="Chelista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Marcelo "Marcello" Ríos</h3>
+                <p class="text-gray-600 mb-4">Chelista, su cello aporta una profundidad y calidez inigualable al ensamble. 🎶</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Marcelo Ríos', 'Chelista.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+            <!-- Percusionista -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/YBtkYswp/percusionista.jpg" alt="Percusionista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Jonathan "Johny" Pérez</h3>
+                <p class="text-gray-600 mb-4">Percusionista, el ritmo y la energía de Johny hacen vibrar cada rincón del escenario. 🥁</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Jonathan Pérez', 'Percusionista.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+            <!-- Arpista -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/VcCQYbDp/ariadna-ari-arpista.jpg" alt="Arpista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Ariadna "Ari" Gómez</h3>
+                <p class="text-gray-600 mb-4">Arpista, sus melodías etéreas transportan a un mundo de ensueño y magia. 💫</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Ariadna Gómez', 'Arpista.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upcoming Events Section -->
+    <section id="eventos" class="section animate-slideInUp">
+        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Próximos Eventos y Boletos 🎟️</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card p-6">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Noche de Cine y Emociones: Dramas Románticos</h3>
+                <p class="text-gray-700 mb-2"><i class="far fa-calendar-alt mr-2 text-gold-600"></i> Fecha: 20 de Septiembre, 2025</p>
+                <p class="text-gray-700 mb-2"><i class="far fa-clock mr-2 text-gold-600"></i> Hora: 8:00 PM</p>
+                <p class="text-gray-700 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Lugar: Restaurante Cornalina</p>
+                <p class="text-gray-700 mb-4">Sumérgete en historias de amor y pasión con las bandas sonoras más conmovedoras del cine.</p>
+                <a href="https://ejemplo.com/boletos-dramas" target="_blank" class="btn-primary w-full text-center block">Comprar Boletos</a>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Una Velada con la Realeza: Estilo Bridgerton</h3>
+                <p class="text-gray-700 mb-2"><i class="far fa-calendar-alt mr-2 text-gold-600"></i> Fecha: 18 de Octubre, 2025</p>
+                <p class="text-gray-700 mb-2"><i class="far fa-clock mr-2 text-gold-600"></i> Hora: 8:00 PM</p>
+                <p class="text-700 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Lugar: Restaurante Cornalina</p>
+                <p class="text-gray-700 mb-4">Déjate llevar por la intriga y el romance de la Regencia, con la música de la famosa serie.</p>
+                <a href="https://ejemplo.com/boletos-bridgerton" target="_blank" class="btn-primary w-full text-center block">Comprar Boletos</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Restaurant Section -->
+    <section id="restaurante" class="section animate-slideInUp">
+        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Nuestro Hogar: Cornalina 🍽️</h2>
+        <div class="bg-white p-6 rounded-xl shadow-lg text-center">
+            <img src="https://i.ibb.co/k6crn121/cornalina-logo.jpg" alt="Logo Cornalina" class="mx-auto w-40 h-auto object-contain mb-6">
+            <p class="text-gray-700 mb-4">Nos enorgullece presentar nuestros conciertos en **Cornalina**, la joya británica escondida en Monterrey. Un lugar donde la elegancia y el buen gusto se fusionan con una experiencia culinaria excepcional. Descubre un ambiente sofisticado, ideal para una noche inolvidable.</p>
+            <div class="mb-4">
+                <h3 class="text-xl font-semibold mb-2 text-gray-800">Ubicación y Contacto</h3>
+                <p class="text-gray-700 mb-2">
+                    <i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> 
+                    Calle Dr. Francisco L. Rocha 204, San Jerónimo, 64640 Monterrey, N.L.
+                </p>
+                <a href="https://www.google.com/maps/search/?api=1&query=Calle+Dr.+Francisco+L.+Rocha+204,+San+Jer%C3%B3nimo,+64640+Monterrey,+N.L." target="_blank" class="btn-primary inline-block mt-2 mb-4">
+                    <i class="fas fa-map-marked-alt mr-2"></i>Ver en Google Maps
+                </a>
+                <p class="text-gray-700 mb-2">
+                    <i class="fas fa-phone mr-2 text-gold-600"></i> 
+                    81 4489 3843
+                </p>
+                <a href="tel:+528144893843" class="btn-primary inline-block mt-2">
+                    <i class="fas fa-phone-alt mr-2"></i>Llamar a Cornalina
+                </a>
+            </div>
+            <div class="mt-6 flex justify-center space-x-4">
+                <a href="https://www.instagram.com/cornalinamx/?hl=es" target="_blank" class="social-share-btn"><i class="fab fa-instagram"></i></a>
+                <a href="https://www.facebook.com/YanosequemascomerMTY/posts/cornalina-descubre-este-nuevo-lugar-donde-podr%C3%A1s-disfrutar-de-comida-brit%C3%A1nica-d/951607163762794/" target="_blank" class="social-share-btn"><i class="fab fa-facebook-f"></i></a>
+                <a href="https://www.tiktok.com/@recomiendamty/video/7455411862012693765" target="_blank" class="social-share-btn"><i class="fab fa-tiktok"></i></a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Photo Gallery Section -->
+    <section id="galeria" class="section animate-slideInUp">
+        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Galería de Momentos 📸</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <img src="https://i.ibb.co/L3rbLkR/Gemini-Generated-Image-9487oa9487oa9487.png" alt="Músicos en Cornalina 1" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+            <img src="https://i.ibb.co/gb12gW70/Gemini-Generated-Image-cp2doncp2doncp2d.png" alt="Músicos en Cornalina 2" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+            <img src="https://i.ibb.co/qYtgnsJM/Gemini-Generated-Image-3rpdk13rpdk13rpd.png" alt="Músicos en Cornalina 3" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+            <img src="https://i.ibb.co/Fb41923g/Gemini-Generated-Image-l5hr1tl5hr1tl5hr.png" alt="Músicos en Cornalina 4" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+            <img src="https://i.ibb.co/VWZrqkpD/Gemini-Generated-Image-vi1ca4vi1ca4vi1c.png" alt="Músicos en Cornalina 5" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+            <img src="https://i.ibb.co/WWgjX1v7/Gemini-Generated-Image-jbkt3ijbkt3ijbkt.png" alt="Músicos en Cornalina 6" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+        </div>
+    </section>
+
+    <!-- Past Comments Section -->
+    <section id="comentarios" class="section animate-slideInUp">
+        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Lo que Dicen Nuestros Invitados 💬</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Comment 1 -->
+            <div class="card p-6">
+                <div class="flex items-center mb-4">
+                    <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=JP" alt="Comensal JP" class="w-12 h-12 rounded-full mr-4 object-cover">
+                    <div>
+                        <p class="font-semibold text-gray-800">Juan Pérez</p>
+                        <div class="text-yellow-500 text-sm"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                    </div>
+                </div>
+                <p class="text-gray-700">"Una experiencia mágica. La música en vivo y la comida crearon una atmósfera inolvidable. ¡Volveremos pronto!" ✨</p>
+            </div>
+            <!-- Comment 2 -->
+            <div class="card p-6">
+                <div class="flex items-center mb-4">
+                    <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=AM" alt="Comensal AM" class="w-12 h-12 rounded-full mr-4 object-cover">
+                    <div>
+                        <p class="font-semibold text-gray-800">Ana María</p>
+                        <div class="text-yellow-500 text-sm"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i></div>
+                    </div>
+                </div>
+                <p class="text-gray-700">"Me encantó la interacción con la app para votar. Hizo que el concierto se sintiera muy personal. ¡Gran idea!" 📱</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contacto" class="section animate-slideInUp">
+        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Contacto Dolce Ensamble 📞</h2>
+        <div class="bg-white p-6 rounded-xl shadow-lg text-center">
+            <p class="text-gray-700 mb-4">¡Nos encantaría ser parte de tu próximo evento especial! Contáctanos para bodas, eventos sociales o corporativos.</p>
+            <p class="text-gray-800 font-semibold text-lg mb-2"><i class="fas fa-envelope mr-2 text-gold-600"></i> info@dolceensamble.com</p>
+            <p class="text-gray-800 font-semibold text-lg mb-4"><i class="fas fa-phone mr-2 text-gold-600"></i> +52 (81) 1234 5678</p>
+            <div class="flex justify-center space-x-4">
+                <a href="https://www.instagram.com/dolceensamble/" target="_blank" class="social-share-btn"><i class="fab fa-instagram"></i></a>
+                <a href="https://www.facebook.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-facebook-f"></i></a>
+                <a href="https://www.youtube.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-youtube"></i></a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Satisfaction Survey Modal -->
+    <div id="satisfactionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">&times;</span>
+            <h3 class="text-2xl font-semibold mb-4 text-gray-800 text-center">Encuesta de Satisfacción ✅</h3>
+            <p class="mb-4 text-gray-700 text-center">Ayúdanos a mejorar tu experiencia. ¡Tu opinión es muy valiosa!</p>
+            <form id="satisfactionForm" class="space-y-4">
+                <div>
+                    <label for="rating" class="block text-gray-700 font-medium mb-2">¿Qué tan satisfecho estás con la experiencia general?</label>
+                    <select id="rating" class="input-field" required>
+                        <option value="">Selecciona una calificación</option>
+                        <option value="5">Excelente (5 estrellas)</option>
+                        <option value="4">Muy Bien (4 estrellas)</option>
+                        <option value="3">Bueno (3 estrellas)</option>
+                        <option value="2">Regular (2 estrellas)</option>
+                        <option value="1">Malo (1 estrella)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="comments_survey" class="block text-gray-700 font-medium mb-2">Comentarios adicionales:</label>
+                    <textarea id="comments_survey" class="input-field h-24" placeholder="¿Qué te gustó más? ¿Qué podríamos mejorar?"></textarea>
+                </div>
+                <button type="submit" class="btn-primary w-full text-center">Enviar Encuesta</button>
+                <p id="surveyMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Encuesta enviada! ¡Muchas gracias! 😊</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- WhatsApp Floating Button -->
+    <a href="https://wa.me/528110474854" class="whatsapp-float" target="_blank">
+        <i class="fab fa-whatsapp"></i>
+    </a>
+
+    <script>
+        // Smooth scrolling for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+                // Close mobile menu if open
+                if (window.innerWidth <= 768) {
+                    document.getElementById('navbar-menu').classList.remove('open');
+                }
+            });
+        });
+
+        // Hamburger menu functionality
+        const hamburger = document.getElementById('hamburger');
+        const navbarMenu = document.getElementById('navbar-menu');
+        hamburger.addEventListener('click', () => {
+            navbarMenu.classList.toggle('open');
+        });
+
+        // Voting mechanism
+        let selectedVote = null;
+        document.querySelectorAll('.vote-option-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove selected class from all buttons
+                document.querySelectorAll('.vote-option-btn').forEach(btn => btn.classList.remove('selected'));
+                // Add selected class to the clicked button
+                this.classList.add('selected');
+                selectedVote = this.dataset.vote;
+            });
+        });
+
+        document.getElementById('submitVoteBtn').addEventListener('click', function() {
+            const voteMessage = document.getElementById('voteMessage');
+            if (selectedVote) {
+                // In a real application, you would send selectedVote to a backend database (e.g., Firestore)
+                console.log('Voto enviado:', selectedVote);
+                voteMessage.textContent = '¡Gracias por tu voto! 🎉';
+                voteMessage.classList.remove('hidden');
+                setTimeout(() => {
+                    voteMessage.classList.add('hidden');
+                    document.querySelectorAll('.vote-option-btn').forEach(btn => btn.classList.remove('selected'));
+                    selectedVote = null;
+                }, 3000);
+            } else {
+                voteMessage.textContent = 'Por favor, selecciona una opción para votar.';
+                voteMessage.classList.remove('hidden');
+                voteMessage.classList.remove('text-green-600');
+                voteMessage.classList.add('text-red-600');
+                setTimeout(() => {
+                    voteMessage.classList.add('hidden');
+                    voteMessage.classList.remove('text-red-600');
+                    voteMessage.classList.add('text-green-600');
+                }, 3000);
+            }
+        });
+
+        // Comment submission
+        document.getElementById('submitCommentBtn').addEventListener('click', function() {
+            const commentInput = document.getElementById('commentInput');
+            const commentMessage = document.getElementById('commentMessage');
+            const comment = commentInput.value.trim();
+            if (comment) {
+                // In a real application, send comment to backend (e.g., Firestore)
+                console.log('Comentario enviado:', comment);
+                commentMessage.textContent = '¡Comentario enviado! Gracias por compartir. ✨';
+                commentMessage.classList.remove('hidden');
+                commentInput.value = ''; // Clear input
+                setTimeout(() => {
+                    commentMessage.classList.add('hidden');
+                }, 3000);
+            } else {
+                commentMessage.textContent = 'Por favor, escribe un comentario antes de enviar.';
+                commentMessage.classList.remove('hidden');
+                commentMessage.classList.remove('text-green-600');
+                commentMessage.classList.add('text-red-600');
+                setTimeout(() => {
+                    commentMessage.classList.add('hidden');
+                    commentMessage.classList.remove('text-red-600');
+                    commentMessage.classList.add('text-green-600');
+                }, 3000);
+            }
+        });
+
+        // Social sharing buttons (example functionality)
+        function shareOnSocial(platform) {
+            let shareText = "Estoy disfrutando de una experiencia increíble en 'La Mesa Acústica' en Cornalina. ¡Música, historias y sabores! #LaMesaAcustica #CornalinaMusic #ExperienciaSensorial";
+            let shareUrl = window.location.href; // URL of the current app
+
+            if (platform === 'facebook') {
+                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank');
+            } else if (platform === 'twitter') {
+                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+            } else if (platform === 'instagram') {
+                // Instagram sharing is complex for web apps. Usually involves native app or direct message.
+                // For a web app, you might just encourage copying a hashtag or text.
+                alert('Para compartir en Instagram, puedes copiar este texto y pegarlo en tu historia o publicación: \n\n' + shareText);
+            }
+        }
+
+        function shareMusician(name, description) {
+            const textToShare = `Conoce a ${name} de La Mesa Acústica: ${description} #LaMesaAcustica #MúsicosCornalina`;
+            if (navigator.share) {
+                navigator.share({
+                    title: `Conoce a ${name}`,
+                    text: textToShare,
+                    url: window.location.href,
+                }).then(() => console.log('Contenido compartido con éxito'))
+                  .catch((error) => console.log('Error al compartir', error));
+            } else {
+                alert(`Puedes compartir sobre ${name} copiando este texto: \n\n${textToShare}`);
+            }
+        }
+
+        // Modal for Satisfaction Survey
+        const satisfactionModal = document.getElementById('satisfactionModal');
+        const satisfactionBtn = document.getElementById('satisfactionBtn');
+        const closeButton = document.querySelector('#satisfactionModal .close-button');
+
+        satisfactionBtn.onclick = function() {
+            satisfactionModal.style.display = "flex";
+        }
+
+        closeButton.onclick = function() {
+            satisfactionModal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == satisfactionModal) {
+                satisfactionModal.style.display = "none";
+            }
+        }
+
+        document.getElementById('satisfactionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const rating = document.getElementById('rating').value;
+            const commentsSurvey = document.getElementById('comments_survey').value.trim();
+            const surveyMessage = document.getElementById('surveyMessage');
+
+            if (rating) {
+                console.log('Encuesta enviada:', { rating, commentsSurvey });
+                surveyMessage.textContent = '¡Encuesta enviada! ¡Muchas gracias! 😊';
+                surveyMessage.classList.remove('hidden');
+                this.reset(); // Clear the form
+                setTimeout(() => {
+                    surveyMessage.classList.add('hidden');
+                    closeModal();
+                }, 3000);
+            } else {
+                surveyMessage.textContent = 'Por favor, selecciona una calificación.';
+                surveyMessage.classList.remove('hidden');
+                surveyMessage.classList.remove('text-green-600');
+                surveyMessage.classList.add('text-red-600');
+                setTimeout(() => {
+                    surveyMessage.classList.add('hidden');
+                    surveyMessage.classList.remove('text-red-600');
+                    surveyMessage.classList.add('text-green-600');
+                }, 3000);
+            }
+        });
+
+        function closeModal() {
+            document.getElementById('satisfactionModal').style.display = "none";
+        }
+
+    </script>
+</body>
+</html>
