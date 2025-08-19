@@ -56,7 +56,7 @@
             max-width: 100%; /* Ensure it doesn't overflow container */
             height: 180px; /* Fixed height for consistent sizing */
             object-fit: contain; /* Ensure the image fits without cropping */
-            margin-bottom: 4rem; /* Increased space between logo and title */
+            margin-bottom: 2rem; /* Adjusted space between logo and title for better separation */
             display: block; /* Ensure it takes its own line for proper margin */
         }
         .navbar {
@@ -65,11 +65,12 @@
         .nav-link {
             padding: 1rem 1.5rem;
             color: #e0b97a; /* Gold/Copper accent */
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for hover effects */
             white-space: nowrap;
         }
         .nav-link:hover {
-            background-color: #3a3a3a;
+            background-color: #3a3a3a; /* Slightly lighter charcoal on hover */
+            color: #f7f3ed; /* Change text color to a soft cream on hover */
         }
         .section {
             padding: 2rem 1rem;
@@ -212,6 +213,31 @@
             background-color: #128c7e;
         }
 
+        /* Floating Survey Button */
+        .survey-float {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: #e0b97a; /* Gold/Copper accent */
+            color: #2c2c2c; /* Dark charcoal */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+            cursor: pointer;
+        }
+        .survey-float:hover {
+            transform: scale(1.1);
+            background-color: #c7a16b;
+        }
+
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .navbar-menu {
@@ -241,7 +267,7 @@
             .header-content img {
                 width: auto;
                 height: 100px; /* Adjusted for smaller screens */
-                margin-bottom: 2rem; /* Adjusted for smaller screens */
+                margin-bottom: 1.5rem; /* Adjusted for smaller screens */
             }
             .header-content h1 {
                 font-size: 2.5rem;
@@ -249,12 +275,17 @@
             .header-content p {
                 font-size: 1rem;
             }
-            .whatsapp-float {
+            .whatsapp-float, .survey-float {
                 width: 50px;
                 height: 50px;
                 font-size: 24px;
                 bottom: 15px;
+            }
+            .whatsapp-float {
                 right: 15px;
+            }
+            .survey-float {
+                left: 15px;
             }
         }
         @media (min-width: 769px) {
@@ -342,8 +373,15 @@
             <div class="card p-6 text-center">
                 <img src="https://i.ibb.co/HpVvkyZ7/Caro.jpg" alt="Cantante" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
                 <h3 class="text-xl font-semibold mb-2">Carolina "Caro" Solís</h3>
-                <p class="text-gray-600 mb-4">Cantante principal y narradora. Su voz, una mezcla de dulzura y poder, te guiará a través de cada historia. 🎤</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Carolina Solís', 'Cantante principal y narradora.')"><i class="fas fa-share-alt"></i></button>
+                <p class="text-gray-600 mb-4">Cantante principal. Su voz, una mezcla de dulzura y poder, te guiará a través de cada historia. 🎤</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Carolina Solís', 'Cantante principal.')"><i class="fas fa-share-alt"></i></button>
+            </div>
+            <!-- Narradora -->
+            <div class="card p-6 text-center">
+                <img src="https://i.ibb.co/vCdB7QZZ/cinthia.jpg" alt="Narradora Cinthia" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                <h3 class="text-xl font-semibold mb-2">Cinthia Garza</h3>
+                <p class="text-gray-600 mb-4">Narradora principal. Con su cautivadora voz, Cinthia te transportará a cada escena, haciendo que cada relato cobre vida. 🗣️</p>
+                <button class="social-share-btn mx-auto" onclick="shareMusician('Cinthia Garza', 'Narradora principal.')"><i class="fas fa-share-alt"></i></button>
             </div>
             <!-- Pianista -->
             <div class="card p-6 text-center">
@@ -527,6 +565,11 @@
         <i class="fab fa-whatsapp"></i>
     </a>
 
+    <!-- Floating Survey Button -->
+    <button id="floatingSurveyBtn" class="survey-float">
+        <i class="fas fa-clipboard-list"></i>
+    </button>
+
     <script>
         // Smooth scrolling for navigation
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -647,18 +690,28 @@
         const satisfactionModal = document.getElementById('satisfactionModal');
         const satisfactionBtn = document.getElementById('satisfactionBtn');
         const closeButton = document.querySelector('#satisfactionModal .close-button');
+        const floatingSurveyBtn = document.getElementById('floatingSurveyBtn');
 
-        satisfactionBtn.onclick = function() {
+
+        // Function to open the modal
+        function openModal() {
             satisfactionModal.style.display = "flex";
         }
 
-        closeButton.onclick = function() {
+        // Function to close the modal
+        function closeModal() {
             satisfactionModal.style.display = "none";
         }
 
+        // Event listeners for opening and closing the modal
+        satisfactionBtn.onclick = openModal; // Navbar button
+        floatingSurveyBtn.onclick = openModal; // New floating button
+        closeButton.onclick = closeModal;
+
+        // Close modal when clicking outside of it
         window.onclick = function(event) {
             if (event.target == satisfactionModal) {
-                satisfactionModal.style.display = "none";
+                closeModal();
             }
         }
 
@@ -689,10 +742,6 @@
                 }, 3000);
             }
         });
-
-        function closeModal() {
-            document.getElementById('satisfactionModal').style.display = "none";
-        }
 
     </script>
 </body>
