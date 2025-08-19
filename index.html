@@ -26,7 +26,7 @@
             background-color: #f7f3ed; /* Soft cream background */
             color: #333;
             overflow-x: hidden; /* Prevent horizontal scrolling */
-            /* Se eliminó el padding-top del body, la barra de navegación se pegará arriba */
+            padding-top: 64px; /* Añadido padding al body para evitar que el contenido sea ocultado por el navbar fijo */
         }
         .container {
             max-width: 100vw;
@@ -46,7 +46,7 @@
             text-align: center;
             color: white;
             position: relative;
-            margin-top: 64px; /* Este margen empuja el contenido del encabezado debajo del navbar fijo */
+            /* Se eliminó el margin-top del header-bg; el padding-top del body lo maneja ahora */
         }
         .header-bg::before {
             content: "";
@@ -84,16 +84,13 @@
             height: 64px; /* Altura explícita para la barra de navegación */
             display: flex; /* Para centrar elementos dentro del navbar */
             align-items: center; /* Centra verticalmente los elementos */
-            padding: 0 1rem; /* Ajusta el padding horizontal si es necesario, elimina el vertical del nav-link */
+            /* Se eliminó padding de .navbar, ahora lo manejan los nav-links */
         }
         .nav-link {
-            padding: 1rem 1.5rem; /* El padding vertical puede ser ajustado aquí si es necesario */
+            padding: 1rem 1.5rem; /* Padding para los enlaces de navegación */
             color: #e0b97a; /* Gold/Copper accent */
             transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for hover effects */
             white-space: nowrap;
-            display: flex; /* Asegura que el texto se centre verticalmente */
-            align-items: center; /* Centra el texto del enlace verticalmente */
-            height: 100%; /* Hace que el enlace ocupe toda la altura del navbar */
         }
         .nav-link:hover {
             background-color: #3a3a3a; /* Slightly lighter charcoal on hover */
@@ -285,6 +282,24 @@
             height: 100%;
         }
 
+        /* Nueva sección para el efecto parallax en la parte media */
+        .middle-parallax-section {
+            background-image: url('https://i.ibb.co/pBfr1P4c/Chat-GPT-Image-18-ago-2025-10-00-59-p-m.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 300px; /* Altura para hacer el efecto visible */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); /* Sombra para mejor legibilidad del texto */
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            padding: 2rem 1rem;
+        }
+
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -355,22 +370,18 @@
 <body class="bg-gray-100 text-gray-800">
 
     <!-- Navbar -->
-    <nav class="navbar p-4 flex justify-between items-center relative z-50">
-        <!-- Removed the text "La Mesa Acústica" from here -->
-        <div class="text-xl font-bold text-white"></div>
+    <nav class="navbar flex items-center relative z-50 justify-between md:justify-center">
         <button id="hamburger" class="text-white text-2xl focus:outline-none md:hidden">
             <i class="fas fa-bars"></i>
         </button>
         <div id="navbar-menu" class="navbar-menu md:flex md:items-center md:space-x-4">
-            <a href="#participa" class="nav-link">Participa ✨</a>
-            <a href="#musicos" class="nav-link">Músicos 🎻</a>
-            <a href="#eventos" class="nav-link">Boletos 🎟️</a>
-            <a href="#galeria" class="nav-link">Galería 📸</a>
-            <a href="#comentarios" class="nav-link">Comentarios 💬</a>
-            <a href="#restaurante" class="nav-link">Restaurante 🍽️</a>
-            <a href="#contacto" class="nav-link">Contacto 📞</a>
-            <!-- Removed the satisfaction survey button from here -->
-            <!-- <button id="satisfactionBtn" class="nav-link">Encuesta de Satisfacción ✅</button> -->
+            <a href="#participa" class="nav-link">✨</a>
+            <a href="#musicos" class="nav-link">🎻</a>
+            <a href="#eventos" class="nav-link">🎟️</a>
+            <a href="#galeria" class="nav-link">📸</a>
+            <a href="#comentarios" class="nav-link">💬</a>
+            <a href="#restaurante" class="nav-link">🍽️</a>
+            <a href="#contacto" class="nav-link">📞</a>
         </div>
     </nav>
 
@@ -412,6 +423,11 @@
                 <button class="social-share-btn" onclick="shareOnSocial('instagram')"><i class="fab fa-instagram"></i></button>
             </div>
         </div>
+    </section>
+
+    <!-- Middle Parallax Section -->
+    <section class="middle-parallax-section">
+        "Donde cada nota cuenta una historia."
     </section>
 
     <!-- Musicians Section -->
@@ -496,37 +512,6 @@
                 <p class="text-700 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Lugar: Restaurante Cornalina</p>
                 <p class="text-gray-700 mb-4">Déjate llevar por la intriga y el romance de la Regencia, con la música de la famosa serie.</p>
                 <a href="https://ejemplo.com/boletos-bridgerton" target="_blank" class="btn-primary w-full text-center block">Comprar Boletos</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Restaurant Section -->
-    <section id="restaurante" class="section animate-slideInUp">
-        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Nuestro Hogar: Cornalina 🍽️</h2>
-        <div class="bg-white p-6 rounded-xl shadow-lg text-center">
-            <img src="https://i.ibb.co/k6crn121/cornalina-logo.jpg" alt="Logo Cornalina" class="mx-auto w-40 h-auto object-contain mb-6">
-            <p class="text-gray-700 mb-4">Nos enorgullece presentar nuestros conciertos en **Cornalina**, la joya británica escondida en Monterrey. Un lugar donde la elegancia y el buen gusto se fusionan con una experiencia culinaria excepcional. Descubre un ambiente sofisticado, ideal para una noche inolvidable.</p>
-            <div class="mb-4">
-                <h3 class="text-xl font-semibold mb-2 text-gray-800">Ubicación y Contacto</h3>
-                <p class="text-gray-700 mb-2">
-                    <i class="fas fa-map-marker-alt mr-2 text-gold-600"></i>
-                    Calle Dr. Francisco L. Rocha 204, San Jerónimo, 64640 Monterrey, N.L.
-                </p>
-                <a href="https://www.google.com/maps/search/?api=1&query=Calle+Dr.+Francisco+L.+Rocha+204,+San+Jer%C3%B3nimo,+64640+Monterrey,+N.L." target="_blank" class="btn-primary inline-block mt-2 mb-4">
-                    <i class="fas fa-map-marked-alt mr-2"></i>Ver en Google Maps
-                </a>
-                <p class="text-gray-700 mb-2">
-                    <i class="fas fa-phone mr-2 text-gold-600"></i>
-                    81 4489 3843
-                </p>
-                <a href="tel:+528144893843" class="btn-primary inline-block mt-2">
-                    <i class="fas fa-phone-alt mr-2"></i>Llamar a Cornalina
-                </a>
-            </div>
-            <div class="mt-6 flex justify-center space-x-4">
-                <a href="https://www.instagram.com/cornalinamx/?hl=es" target="_blank" class="social-share-btn"><i class="fab fa-instagram"></i></a>
-                <a href="https://www.facebook.com/YanosequemascomerMTY/posts/cornalina-descubre-este-nuevo-lugar-donde-podr%C3%A1s-disfrutar-de-comida-brit%C3%A1nica-d/951607163762794/" target="_blank" class="social-share-btn"><i class="fab fa-facebook-f"></i></a>
-                <a href="https://www.tiktok.com/@recomiendamty/video/7455411862012693765" target="_blank" class="social-share-btn"><i class="fab fa-tiktok"></i></a>
             </div>
         </div>
     </section>
@@ -752,8 +737,6 @@
 
         // Modal for Satisfaction Survey
         const satisfactionModal = document.getElementById('satisfactionModal');
-        // Removed the navbar button for satisfaction survey from JS event listener as well
-        // const satisfactionBtn = document.getElementById('satisfactionBtn');
         const closeButton = document.querySelector('#satisfactionModal .close-button');
         const floatingSurveyBtn = document.getElementById('floatingSurveyBtn'); // Floating button
 
