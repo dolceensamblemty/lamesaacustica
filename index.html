@@ -15,6 +15,7 @@
             background-color: #f7f3ed; /* Soft cream background */
             color: #333;
             overflow-x: hidden; /* Prevent horizontal scrolling */
+            padding-top: 64px; /* Added padding to body to prevent content from being hidden by fixed navbar */
         }
         .container {
             max-width: 100vw;
@@ -32,6 +33,7 @@
             text-align: center;
             color: white;
             position: relative;
+            /* Removed margin-top from header-bg */
         }
         .header-bg::before {
             content: "";
@@ -49,18 +51,22 @@
             align-items: center;
             justify-content: center;
             height: 100%; /* Ensure content takes full height to center items */
-            padding: 1rem; /* Add some padding */
+            padding: 2rem 1rem; /* Increased padding top/bottom for more space */
         }
         .header-content img {
             width: auto;
             max-width: 100%; /* Ensure it doesn't overflow container */
-            height: 180px; /* Fixed height for consistent sizing */
+            height: 150px; /* Adjusted height for better spacing */
             object-fit: contain; /* Ensure the image fits without cropping */
-            margin-bottom: 2rem; /* Adjusted space between logo and title for better separation */
+            margin-bottom: 3rem; /* Increased space between logo and title */
             display: block; /* Ensure it takes its own line for proper margin */
         }
         .navbar {
             background-color: #2c2c2c; /* Dark charcoal */
+            position: fixed; /* Make navbar sticky */
+            top: 0; /* Position at the top */
+            width: 100%; /* Full width */
+            z-index: 100; /* Ensure it stays above other content */
         }
         .nav-link {
             padding: 1rem 1.5rem;
@@ -240,15 +246,21 @@
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
+            body {
+                padding-top: 64px; /* Ensure mobile header also accounts for fixed navbar */
+            }
+            .header-bg {
+                /* Removed margin-top from header-bg for mobile as well */
+            }
             .navbar-menu {
                 display: none;
                 flex-direction: column;
                 width: 100%;
                 background-color: #2c2c2c;
-                position: absolute;
+                position: absolute; /* Changed to absolute for mobile menu to slide down from fixed nav */
                 top: 64px; /* Height of the navbar */
                 left: 0;
-                z-index: 50;
+                z-index: 50; /* Z-index below the fixed navbar, but above page content */
             }
             .navbar-menu.open {
                 display: flex;
@@ -302,7 +314,8 @@
 
     <!-- Navbar -->
     <nav class="navbar p-4 flex justify-between items-center relative z-50">
-        <div class="text-xl font-bold text-white">La Mesa Acústica</div>
+        <!-- Removed the text "La Mesa Acústica" from here -->
+        <div class="text-xl font-bold text-white"></div>
         <button id="hamburger" class="text-white text-2xl focus:outline-none md:hidden">
             <i class="fas fa-bars"></i>
         </button>
@@ -401,7 +414,7 @@
             <div class="card p-6 text-center">
                 <img src="https://i.ibb.co/C5jHH4jy/marcello.jpg" alt="Chelista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
                 <h3 class="text-xl font-semibold mb-2">Marcelo "Marcello" Ríos</h3>
-                <p class="text-gray-600 mb-4">Chelista, su cello aporta una profundidad y calidez inigualable al ensamble. 🎶</p>
+                <p class="text-gray-600 mb-4">Chelista, su cello aporta una profundidad y calidez inigualable al ensamble.🎶</p>
                 <button class="social-share-btn mx-auto" onclick="shareMusician('Marcelo Ríos', 'Chelista.')"><i class="fas fa-share-alt"></i></button>
             </div>
             <!-- Percusionista -->
@@ -453,14 +466,14 @@
             <div class="mb-4">
                 <h3 class="text-xl font-semibold mb-2 text-gray-800">Ubicación y Contacto</h3>
                 <p class="text-gray-700 mb-2">
-                    <i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> 
+                    <i class="fas fa-map-marker-alt mr-2 text-gold-600"></i>
                     Calle Dr. Francisco L. Rocha 204, San Jerónimo, 64640 Monterrey, N.L.
                 </p>
                 <a href="https://www.google.com/maps/search/?api=1&query=Calle+Dr.+Francisco+L.+Rocha+204,+San+Jer%C3%B3nimo,+64640+Monterrey,+N.L." target="_blank" class="btn-primary inline-block mt-2 mb-4">
                     <i class="fas fa-map-marked-alt mr-2"></i>Ver en Google Maps
                 </a>
                 <p class="text-gray-700 mb-2">
-                    <i class="fas fa-phone mr-2 text-gold-600"></i> 
+                    <i class="fas fa-phone mr-2 text-gold-600"></i>
                     81 4489 3843
                 </p>
                 <a href="tel:+528144893843" class="btn-primary inline-block mt-2">
@@ -646,7 +659,6 @@
             } else {
                 commentMessage.textContent = 'Por favor, escribe un comentario antes de enviar.';
                 commentMessage.classList.remove('hidden');
-                commentMessage.classList.remove('text-green-600');
                 commentMessage.classList.add('text-red-600');
                 setTimeout(() => {
                     commentMessage.classList.add('hidden');
@@ -688,9 +700,9 @@
 
         // Modal for Satisfaction Survey
         const satisfactionModal = document.getElementById('satisfactionModal');
-        const satisfactionBtn = document.getElementById('satisfactionBtn');
+        const satisfactionBtn = document.getElementById('satisfactionBtn'); // Navbar button
         const closeButton = document.querySelector('#satisfactionModal .close-button');
-        const floatingSurveyBtn = document.getElementById('floatingSurveyBtn');
+        const floatingSurveyBtn = document.getElementById('floatingSurveyBtn'); // Floating button
 
 
         // Function to open the modal
@@ -704,8 +716,8 @@
         }
 
         // Event listeners for opening and closing the modal
-        satisfactionBtn.onclick = openModal; // Navbar button
-        floatingSurveyBtn.onclick = openModal; // New floating button
+        satisfactionBtn.onclick = openModal; // Navbar button to open modal
+        floatingSurveyBtn.onclick = openModal; // Floating button to open modal
         closeButton.onclick = closeModal;
 
         // Close modal when clicking outside of it
