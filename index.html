@@ -77,7 +77,8 @@
             const nowPlayingTopBar = document.getElementById('now-playing-top-bar');
             const navbar = document.querySelector('.navbar');
 
-            let isAuthenticatedAsAdmin = user && user.email === 'admin@example.com';
+            // *** MODIFICACIÓN AQUÍ: CAMBIAR 'admin@example.com' al correo electrónico real del administrador ***
+            let isAuthenticatedAsAdmin = user && user.email === 'dolceensamblenty@gmail.com';
             console.log("isAuthenticatedAsAdmin check (inside updateView):", isAuthenticatedAsAdmin);
 
             // Ensure all main view containers are hidden by default using style.display
@@ -338,7 +339,7 @@
 
         // Setup Admin Songs Listener (Real-time updates)
         function setupAdminSongsListener() {
-            if (!db || !auth.currentUser || auth.currentUser.email !== 'admin@example.com') {
+            if (!db || !auth.currentUser || auth.currentUser.email !== 'dolceensamblenty@gmail.com') { // Updated admin email check
                 const songsListContainer = document.getElementById('admin-songs-list');
                 if (songsListContainer) songsListContainer.innerHTML = '<p class="text-center text-gray-400">Acceso no autorizado para ver canciones.</p>';
                 return null;
@@ -549,7 +550,7 @@
 
         // Setup Admin Comments Listener
         function setupAdminCommentsListener() {
-            if (!db || !auth.currentUser || auth.currentUser.email !== 'admin@example.com') {
+            if (!db || !auth.currentUser || auth.currentUser.email !== 'dolceensamblenty@gmail.com') { // Updated admin email check
                 const commentsListContainer = document.getElementById('admin-comments-list');
                 if (commentsListContainer) commentsListContainer.innerHTML = '<p class="text-center text-gray-400">Acceso no autorizado para ver comentarios.</p>';
                 return null;
@@ -1059,7 +1060,8 @@
             <h2 class="text-3xl font-bold mb-6 text-gray-900">Acceso de Administrador</h2>
             <form id="login-form" class="space-y-4">
                 <div>
-                    <input type="email" id="admin-email" placeholder="Correo Electrónico" class="input-field" required value="admin@example.com">
+                    <!-- MODIFICACIÓN AQUÍ: Valor por defecto para el correo del administrador -->
+                    <input type="email" id="admin-email" placeholder="Correo Electrónico" class="input-field" required value="dolceensamblenty@gmail.com">
                 </div>
                 <!-- Password input with toggle -->
                 <div class="relative">
