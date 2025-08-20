@@ -68,7 +68,7 @@
 
         // Function to determine and render view based on URL hash and auth state
         function updateView(user) {
-            console.log("updateView called. User provided:", user ? user.email : 'null', "Current Hash:", window.location.hash);
+            console.log("updateView called. User:", user ? user.email : 'null', "Hash:", window.location.hash);
             const mainContent = document.getElementById('main-content');
             const loginFormContainer = document.getElementById('login-form-container');
             const adminDashboard = document.getElementById('admin-dashboard');
@@ -76,35 +76,48 @@
             const nowPlayingTopBar = document.getElementById('now-playing-top-bar'); // New top bar
 
             let isAuthenticatedAsAdmin = user && user.email === 'admin@example.com';
-            console.log("isAuthenticatedAsAdmin:", isAuthenticatedAsAdmin);
+            console.log("isAuthenticatedAsAdmin check:", isAuthenticatedAsAdmin);
 
             // First, hide all main view containers and the top bar
             mainContent.classList.add('hidden');
+            console.log("mainContent hidden:", mainContent.classList.contains('hidden'));
+
             loginFormContainer.classList.add('hidden');
+            console.log("loginFormContainer hidden:", loginFormContainer.classList.contains('hidden'));
+
             adminDashboard.classList.add('hidden');
+            console.log("adminDashboard hidden:", adminDashboard.classList.contains('hidden'));
+
             songDetailsPage.classList.add('hidden');
+            console.log("songDetailsPage hidden:", songDetailsPage.classList.contains('hidden'));
+
             nowPlayingTopBar.classList.add('hidden'); // Ensure top bar is hidden initially
+            console.log("nowPlayingTopBar hidden:", nowPlayingTopBar.classList.contains('hidden'));
+
 
             // Determine which view to show
             if (window.location.hash === '#admin') {
                 if (isAuthenticatedAsAdmin) {
-                    console.log("Showing admin dashboard.");
+                    console.log("Condition: #admin and isAuthenticatedAsAdmin is TRUE. Showing admin dashboard.");
                     adminDashboard.classList.remove('hidden'); // Show admin panel
+                    console.log("adminDashboard hidden after removal:", adminDashboard.classList.contains('hidden'));
                     document.getElementById('admin-email-display').textContent = user.email;
                     if (isFirebaseInitialized) {
                         adminSongsListenerUnsubscribe = setupAdminSongsListener();
                         adminCommentsListenerUnsubscribe = setupAdminCommentsListener();
                     }
                 } else {
-                    console.log("Showing login form for admin access.");
+                    console.log("Condition: #admin but isAuthenticatedAsAdmin is FALSE. Showing login form.");
                     loginFormContainer.classList.remove('hidden'); // Show login form
+                    console.log("loginFormContainer hidden after removal:", loginFormContainer.classList.contains('hidden'));
                     document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
                     document.getElementById('login-message').classList.remove('text-green-600');
                     document.getElementById('login-message').classList.add('text-red-600');
                 }
             } else if (window.location.hash === '#song-details') {
-                console.log("Showing song details page.");
+                console.log("Condition: #song-details. Showing song details page.");
                 songDetailsPage.classList.remove('hidden'); // Show song details page
+                console.log("songDetailsPage hidden after removal:", songDetailsPage.classList.contains('hidden'));
                 // Only show details if currentSongData is available, otherwise try to load it
                 if (currentSongData) {
                     displaySongDetails(currentSongData);
@@ -114,9 +127,10 @@
                     }
                 }
             } else {
-                console.log("Showing main public content.");
+                console.log("Condition: No specific hash. Showing main public content.");
                 // Default public view
                 mainContent.classList.remove('hidden'); // Show main public content
+                console.log("mainContent hidden after removal:", mainContent.classList.contains('hidden'));
                 // Set up current song listener for the new top bar
                 if (isFirebaseInitialized) {
                     currentSongListenerUnsubscribe = setupCurrentSongListener();
@@ -192,12 +206,22 @@
             }
             console.log("Attempting admin login with email:", email);
             try {
-                await signInWithEmailAndPassword(auth, email, password);
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 loginMessage.textContent = 'Inicio de sesión exitoso.';
                 loginMessage.classList.remove('text-red-600');
                 loginMessage.classList.add('text-green-600');
-                console.log("Admin login successful. onAuthStateChanged should trigger next.");
-                // The onAuthStateChanged listener will handle showing the admin panel
+                console.log("Admin login successful. UserCredential:", userCredential.user.email);
+                
+                // *** MODIFICACIÓN CLAVE AQUÍ: Ocultar el formulario de login explícitamente ***
+                const loginFormContainer = document.getElementById('login-form-container');
+                if (loginFormContainer) {
+                    loginFormContainer.classList.add('hidden');
+                    console.log("loginFormContainer explicitly hidden after successful login.");
+                }
+                
+                // The onAuthStateChanged listener will handle showing the admin panel after this
+                // It should be triggered automatically by Firebase after userCredential.user becomes active.
+
             } catch (error) {
                 console.error("Error al iniciar sesión:", error);
                 loginMessage.textContent = `Error: ${error.message}`;
