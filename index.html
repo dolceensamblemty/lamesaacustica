@@ -68,6 +68,7 @@
 
         // Function to determine and render view based on URL hash and auth state
         function updateView(user) {
+            console.log("updateView called. User provided:", user ? user.email : 'null', "Current Hash:", window.location.hash);
             const mainContent = document.getElementById('main-content');
             const loginFormContainer = document.getElementById('login-form-container');
             const adminDashboard = document.getElementById('admin-dashboard');
@@ -75,6 +76,7 @@
             const nowPlayingTopBar = document.getElementById('now-playing-top-bar'); // New top bar
 
             let isAuthenticatedAsAdmin = user && user.email === 'admin@example.com';
+            console.log("isAuthenticatedAsAdmin:", isAuthenticatedAsAdmin);
 
             // First, hide all main view containers and the top bar
             mainContent.classList.add('hidden');
@@ -86,6 +88,7 @@
             // Determine which view to show
             if (window.location.hash === '#admin') {
                 if (isAuthenticatedAsAdmin) {
+                    console.log("Showing admin dashboard.");
                     adminDashboard.classList.remove('hidden'); // Show admin panel
                     document.getElementById('admin-email-display').textContent = user.email;
                     if (isFirebaseInitialized) {
@@ -93,12 +96,14 @@
                         adminCommentsListenerUnsubscribe = setupAdminCommentsListener();
                     }
                 } else {
+                    console.log("Showing login form for admin access.");
                     loginFormContainer.classList.remove('hidden'); // Show login form
                     document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
                     document.getElementById('login-message').classList.remove('text-green-600');
                     document.getElementById('login-message').classList.add('text-red-600');
                 }
             } else if (window.location.hash === '#song-details') {
+                console.log("Showing song details page.");
                 songDetailsPage.classList.remove('hidden'); // Show song details page
                 // Only show details if currentSongData is available, otherwise try to load it
                 if (currentSongData) {
@@ -109,6 +114,7 @@
                     }
                 }
             } else {
+                console.log("Showing main public content.");
                 // Default public view
                 mainContent.classList.remove('hidden'); // Show main public content
                 // Set up current song listener for the new top bar
@@ -116,7 +122,7 @@
                     currentSongListenerUnsubscribe = setupCurrentSongListener();
                 }
             }
-            console.log("View updated based on auth state and hash. User:", user ? user.uid : 'null', "Hash:", window.location.hash);
+            console.log("View update completed.");
         }
 
         // Initialize Firebase
@@ -125,23 +131,46 @@
             auth = getAuth(app);
             db = getFirestore(app);
             isFirebaseInitialized = true;
+            console.log("Firebase Initialized.");
 
             onAuthStateChanged(auth, async (user) => {
+                console.log("onAuthStateChanged triggered. User:", user ? user.email : 'null', "User UID:", user ? user.uid : 'null', "Current Hash:", window.location.hash);
+                // Clear existing listeners to prevent multiple subscriptions or issues during state changes
+                if (currentSongListenerUnsubscribe) {
+                    currentSongListenerUnsubscribe();
+                    currentSongListenerUnsubscribe = null;
+                }
+                if (adminSongsListenerUnsubscribe) {
+                    adminSongsListenerUnsubscribe();
+                    adminSongsListenerUnsubscribe = null;
+                }
+                if (adminCommentsListenerUnsubscribe) {
+                    adminCommentsListenerUnsubscribe();
+                    adminCommentsListenerUnsubscribe = null;
+                }
+
                 if (!user) {
                     userId = 'anonymous';
                     try {
                         await signInAnonymously(auth);
+                        console.log("Attempted anonymous sign-in.");
                     } catch (error) {
                         console.error("Error during anonymous sign-in:", error);
                     }
                 } else {
                     userId = user.uid;
+                    console.log("User is authenticated. UID:", userId);
                 }
+                console.log("Calling updateView from onAuthStateChanged. Effective userId:", userId);
                 updateView(user);
             });
 
-            window.addEventListener('hashchange', () => updateView(auth.currentUser));
+            window.addEventListener('hashchange', () => {
+                console.log("Hash changed to:", window.location.hash);
+                updateView(auth.currentUser);
+            });
             updateView(auth.currentUser); // Initial call
+            console.log("Initial updateView called.");
 
         } else {
             console.error("Firebase config not found or is still placeholder. Please replace 'TU_API_KEY_AQUI' and other placeholders with your actual Firebase config.");
@@ -161,13 +190,14 @@
                 loginMessage.classList.add('text-red-600');
                 return;
             }
-
+            console.log("Attempting admin login with email:", email);
             try {
                 await signInWithEmailAndPassword(auth, email, password);
                 loginMessage.textContent = 'Inicio de sesión exitoso.';
                 loginMessage.classList.remove('text-red-600');
                 loginMessage.classList.add('text-green-600');
-                // updateView will be called by onAuthStateChanged after successful login
+                console.log("Admin login successful. onAuthStateChanged should trigger next.");
+                // The onAuthStateChanged listener will handle showing the admin panel
             } catch (error) {
                 console.error("Error al iniciar sesión:", error);
                 loginMessage.textContent = `Error: ${error.message}`;
