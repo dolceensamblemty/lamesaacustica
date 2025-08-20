@@ -26,6 +26,7 @@
         let currentSongData = null; // Variable para almacenar la información de la canción actual
 
         // Firebase configuration (REEMPLAZA ESTO CON TUS VALORES REALES DE FIREBASE)
+        // Asegúrate de que estos valores sean los de TU proyecto de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDiToXPpDhmu5b3RZI43BKJwgixue9tbzs",
             authDomain: "la-mesa-acustica-app.firebaseapp.com",
@@ -56,17 +57,13 @@
         // Placeholder functions for social sharing (to prevent errors)
         function shareOnSocial(platform) {
             console.log(`Intentando compartir en ${platform}. Esta funcionalidad requiere integración real.`);
-            // Implementación real implicaría APIs de cada plataforma
-            // Por ahora, podrías abrir una ventana simple:
-            // window.open(`https://www.${platform}.com/share?text=La Mesa Acústica`, '_blank');
         }
 
         function shareMusician(name, description) {
             console.log(`Intentando compartir información de ${name}: ${description}.`);
-            // Implementación real para compartir datos específicos del músico
         }
-        window.shareOnSocial = shareOnSocial; // Make globally accessible
-        window.shareMusician = shareMusician; // Make globally accessible
+        window.shareOnSocial = shareOnSocial;
+        window.shareMusician = shareMusician;
 
 
         // Function to determine and render view based on URL hash and auth state
@@ -74,62 +71,47 @@
             const mainContent = document.getElementById('main-content');
             const loginFormContainer = document.getElementById('login-form-container');
             const adminDashboard = document.getElementById('admin-dashboard');
-            const adminEmailDisplay = document.getElementById('admin-email-display');
-            const songDetailsPage = document.getElementById('song-details-page'); // Nueva página de detalles de canción
+            const songDetailsPage = document.getElementById('song-details-page');
+            const nowPlayingTopBar = document.getElementById('now-playing-top-bar'); // New top bar
 
             let isAuthenticatedAsAdmin = user && user.email === 'admin@example.com';
 
-            // Unsubscribe existing listeners to avoid duplicates or incorrect data access
-            if (currentSongListenerUnsubscribe) {
-                currentSongListenerUnsubscribe();
-                currentSongListenerUnsubscribe = null;
-            }
-            if (adminSongsListenerUnsubscribe) {
-                adminSongsListenerUnsubscribe();
-                adminSongsListenerUnsubscribe = null;
-            }
-            if (adminCommentsListenerUnsubscribe) {
-                adminCommentsListenerUnsubscribe();
-                adminCommentsListenerUnsubscribe = null;
-            }
-
-            // Ocultar todos los contenedores al inicio de cada updateView
+            // First, hide all main view containers and the top bar
             mainContent.classList.add('hidden');
             loginFormContainer.classList.add('hidden');
             adminDashboard.classList.add('hidden');
             songDetailsPage.classList.add('hidden');
+            nowPlayingTopBar.classList.add('hidden'); // Ensure top bar is hidden initially
 
+            // Determine which view to show
             if (window.location.hash === '#admin') {
                 if (isAuthenticatedAsAdmin) {
-                    adminDashboard.classList.remove('hidden'); // Mostrar panel admin
-                    adminEmailDisplay.textContent = user.email;
+                    adminDashboard.classList.remove('hidden'); // Show admin panel
+                    document.getElementById('admin-email-display').textContent = user.email;
                     if (isFirebaseInitialized) {
                         adminSongsListenerUnsubscribe = setupAdminSongsListener();
                         adminCommentsListenerUnsubscribe = setupAdminCommentsListener();
                     }
                 } else {
-                    loginFormContainer.classList.remove('hidden'); // Mostrar formulario de login
+                    loginFormContainer.classList.remove('hidden'); // Show login form
                     document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
                     document.getElementById('login-message').classList.remove('text-green-600');
                     document.getElementById('login-message').classList.add('text-red-600');
                 }
             } else if (window.location.hash === '#song-details') {
-                // Mostrar página de detalles de canción
-                songDetailsPage.classList.remove('hidden');
-                // Se necesita que currentSongData ya esté cargado para mostrar detalles
+                songDetailsPage.classList.remove('hidden'); // Show song details page
+                // Only show details if currentSongData is available, otherwise try to load it
                 if (currentSongData) {
                     displaySongDetails(currentSongData);
                 } else {
-                    // Fallback: si se accede directamente a #song-details sin pasar por main-content,
-                    // intentar cargar la canción actual.
                     if (isFirebaseInitialized) {
-                         setupCurrentSongListener(true); // Pasar true para forzar la actualización de detalles
+                        setupCurrentSongListener(true); // Force update to load details
                     }
                 }
-            }
-            else {
-                // Vista pública
-                mainContent.classList.remove('hidden'); // Mostrar contenido principal
+            } else {
+                // Default public view
+                mainContent.classList.remove('hidden'); // Show main public content
+                // Set up current song listener for the new top bar
                 if (isFirebaseInitialized) {
                     currentSongListenerUnsubscribe = setupCurrentSongListener();
                 }
@@ -353,12 +335,10 @@
         }
 
         // Setup Current Song Listener for Users (Real-time updates)
-        // forceDetailsUpdate: if true, will also update the #song-details-page if it's currently visible
-        function setupCurrentSongListener(forceDetailsUpdate = false) {
+        function setupCurrentSongListener() {
             if (!db) return null;
 
-            const currentSongDisplay = document.getElementById('current-song-display');
-            if (!currentSongDisplay) return null;
+            const nowPlayingTopBar = document.getElementById('now-playing-top-bar'); // Get the new top bar element
 
             return onSnapshot(doc(db, `artifacts/${appId}/app_state/current_song`), async (docSnapshot) => {
                 if (docSnapshot.exists()) {
@@ -370,43 +350,38 @@
                         if (songDoc.exists()) {
                             const song = songDoc.data();
                             currentSongData = { ...song, id: songDoc.id }; // Store current song data globally
-                            currentSongDisplay.classList.remove('hidden');
-                            currentSongDisplay.innerHTML = `
-                                <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 animate-fadeIn">
-                                    <div class="md:w-1/3">
-                                        <img src="${song.imageUrl}" onerror="this.onerror=null; this.src='https://placehold.co/300x200/cccccc/333333?text=Imagen+No+Disponible';" alt="${song.title}" class="rounded-lg shadow-md w-full h-auto object-cover">
-                                    </div>
-                                    <div class="md:w-2/3 text-center md:text-left">
-                                        <p class="text-sm text-gold-600 font-bold mb-1">¡Ahora Sonando! 🎶</p>
-                                        <h3 class="text-3xl font-extrabold text-gray-900 mb-2">${song.title}</h3>
-                                        <p class="text-gray-700">${song.description}</p>
-                                        <button id="viewSongDetailsBtn" class="btn-primary mt-4 text-sm px-4 py-2">Ver Detalles de la Canción ▶️</button>
-                                    </div>
+
+                            // Update the new top bar with song info
+                            nowPlayingTopBar.classList.remove('hidden');
+                            nowPlayingTopBar.innerHTML = `
+                                <div class="flex items-center justify-between p-2 md:px-4 bg-gold-600 text-white shadow-md rounded-b-lg w-full max-w-4xl mx-auto animate-fadeIn">
+                                    <span class="text-sm md:text-base font-semibold">¡Ahora Sonando! 🎶 ${song.title}</span>
+                                    <button id="viewSongDetailsBtn" class="bg-white text-gold-600 px-3 py-1 rounded-full text-xs md:text-sm font-bold hover:bg-gray-100 transition duration-300">Ver Detalles ▶️</button>
                                 </div>
                             `;
-                            // Attach event listener to the new button
                             document.getElementById('viewSongDetailsBtn')?.addEventListener('click', () => {
                                 window.location.hash = '#song-details';
                             });
 
-                            if (window.location.hash === '#song-details' || forceDetailsUpdate) {
+                            // If currently on the song details page, update its content
+                            if (window.location.hash === '#song-details') {
                                 displaySongDetails(currentSongData);
                             }
 
                         } else {
-                            currentSongDisplay.classList.add('hidden');
+                            nowPlayingTopBar.classList.add('hidden'); // Hide top bar if song not found
                             console.warn("Current song ID exists but song details not found:", cancionActualId);
                         }
                     } else {
-                        currentSongDisplay.classList.add('hidden');
+                        nowPlayingTopBar.classList.add('hidden'); // Hide top bar if no current song ID
                     }
                 } else {
-                    currentSongDisplay.classList.add('hidden');
+                    nowPlayingTopBar.classList.add('hidden'); // Hide top bar if 'current_song' document doesn't exist
                     console.log("No current song state document found.");
                 }
             }, (error) => {
                 console.error("Error listening to current song state:", error);
-                currentSongDisplay.classList.add('hidden');
+                nowPlayingTopBar.classList.add('hidden');
             });
         }
 
@@ -419,7 +394,7 @@
                         <img src="${song.imageUrl}" onerror="this.onerror=null; this.src='https://placehold.co/400x300/cccccc/333333?text=Imagen+No+Disponible';" alt="${song.title}" class="rounded-lg shadow-lg mb-6 w-full object-cover max-h-96">
                         <h3 class="text-4xl font-extrabold text-gray-900 mb-3 text-center">${song.title} 🎵</h3>
                         <p class="text-gray-700 text-lg mb-6 text-center">${song.description}</p>
-                        <button id="backToMainBtn" class="btn-primary text-lg px-6 py-3">Volver a la Página Principal ⏪🏠</button>
+                        <button id="backToMainBtn" class="btn-primary text-lg px-6 py-3 hover:bg-gold-500 transition duration-300">Volver a la Página Principal ⏪🏠</button>
                     </div>
                 `;
                 document.getElementById('backToMainBtn')?.addEventListener('click', () => {
@@ -533,6 +508,22 @@
                 });
             }
 
+            // Password toggle for admin login
+            const passwordInput = document.getElementById('admin-password');
+            const togglePassword = document.getElementById('toggle-password');
+            if (passwordInput && togglePassword) {
+                togglePassword.addEventListener('click', function () {
+                    // toggle the type attribute
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+
+                    // toggle the eye icon
+                    this.classList.toggle('fa-eye');
+                    this.classList.toggle('fa-eye-slash');
+                });
+            }
+
+
             // Lógica para votos
             document.querySelectorAll('.vote-option-btn').forEach(button => {
                 button.addEventListener('click', (event) => {
@@ -606,8 +597,24 @@
             background-color: #000; /* Fondo negro para el body */
             color: #333;
             overflow-x: hidden; /* Prevent horizontal scrolling */
-            padding-top: 64px; /* Añadido padding al body para evitar que el contenido sea ocultado por el navbar fijo */
+            padding-top: 64px; /* Añadido padding al body para evitar que el contenido sea ocultado por el navbar fijo. Se ajustará dinámicamente con JS si la barra superior "Ahora Sonando" está visible. */
         }
+
+        /* Top "Ahora Sonando" bar style */
+        #now-playing-top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 101; /* Higher than navbar */
+            transition: all 0.3s ease-in-out;
+            transform: translateY(-100%); /* Start hidden above viewport */
+            /* Tailwind classes will manage visibility and positioning on show */
+        }
+        #now-playing-top-bar.active { /* Class added by JS when visible */
+            transform: translateY(0);
+        }
+
         .container {
             max-width: 100vw;
             overflow-x: hidden;
@@ -626,7 +633,6 @@
             text-align: center;
             color: white;
             position: relative;
-            /* Se eliminó el margin-top del header-bg; el padding-top del body lo maneja ahora */
         }
         .header-bg::before {
             content: "";
@@ -657,20 +663,26 @@
         .navbar {
             background-color: #2c2c2c; /* Dark charcoal */
             position: fixed; /* Make navbar sticky */
-            top: 0; /* Position at the very top of the viewport */
+            top: 64px; /* Position below the top bar (if visible) or at 0 otherwise, adjusted by JS */
             left: 0; /* Asegura que no haya espacio a la izquierda */
             width: 100%; /* Full width */
             z-index: 100; /* Ensure it stays above other content */
             height: 64px; /* Altura explícita para la barra de navegación */
             display: flex; /* Para centrar elementos dentro del navbar */
             align-items: center; /* Centra verticalmente los elementos */
-            /* Se eliminó padding de .navbar, ahora lo manejan los nav-links */
+        }
+        .navbar-menu {
+            display: flex;
+            flex-wrap: wrap; /* Permite que los elementos se envuelvan en varias líneas */
+            justify-content: center; /* Centra los elementos horizontalmente */
+            gap: 0.5rem; /* Espacio entre los elementos */
+            width: 100%; /* Ocupa todo el ancho disponible */
         }
         .nav-link {
-            padding: 1rem 1.5rem; /* Padding para los enlaces de navegación */
+            padding: 0.75rem 1rem; /* Padding ajustado para el envolvimiento */
             color: #e0b97a; /* Gold/Copper accent */
             transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for hover effects */
-            white-space: nowrap;
+            /* white-space: nowrap; REMOVED to allow wrapping */
         }
         .nav-link:hover {
             background-color: #3a3a3a; /* Slightly lighter charcoal on hover */
@@ -887,10 +899,10 @@
         /* Responsive adjustments */
         @media (max-width: 768px) {
             body {
-                padding-top: 64px; /* Ensure mobile header also accounts for fixed navbar */
+                padding-top: 64px; /* Default padding for mobile, adjusted if top bar is active */
             }
-            .header-bg {
-                /* Removed margin-top from header-bg for mobile as well */
+            .navbar {
+                top: 64px; /* Fixed position below a potential top bar */
             }
             .navbar-menu {
                 display: none;
@@ -952,8 +964,12 @@
                 <div>
                     <input type="email" id="admin-email" placeholder="Correo Electrónico" class="input-field" required value="admin@example.com">
                 </div>
-                <div>
-                    <input type="password" id="admin-password" placeholder="Contraseña" class="input-field" required value="password123">
+                <!-- Password input with toggle -->
+                <div class="relative">
+                    <input type="password" id="admin-password" placeholder="Contraseña" class="input-field pr-10" required value="password123">
+                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
+                        <i class="fas fa-eye cursor-pointer text-gray-500 hover:text-gray-700" id="toggle-password"></i>
+                    </span>
                 </div>
                 <button type="submit" class="btn-primary w-full">Iniciar Sesión</button>
                 <p id="login-message" class="mt-4 text-red-600"></p>
@@ -1014,6 +1030,11 @@
         </div>
     </div>
 
+    <!-- NEW: "Ahora Sonando" Top Bar -->
+    <div id="now-playing-top-bar" class="hidden">
+        <!-- Content dynamically loaded by JS -->
+    </div>
+
 
     <!-- Main Content (Visible by default unless admin login form is active or admin dashboard is shown) -->
     <div id="main-content">
@@ -1023,13 +1044,13 @@
                 <i class="fas fa-bars"></i>
             </button>
             <div id="navbar-menu" class="navbar-menu md:flex md:items-center md:space-x-4">
-                <a href="#participa" class="nav-link" title="Participa en el Concierto">✨</a>
-                <a href="#musicos" class="nav-link" title="Nuestros Músicos y Narradora">🎻</a>
-                <a href="#eventos" class="nav-link" title="Próximos Eventos y Boletos">🎟️</a>
-                <a href="#galeria" class="nav-link" title="Galería de Momentos">📸</a>
-                <a href="#comentarios" class="nav-link" title="Comentarios de Invitados">💬</a>
-                <a href="#restaurante" class="nav-link" title="Sección del Restaurante">🍽️</a>
-                <a href="#contacto" class="nav-link" title="Contacto Dolce Ensamble">📞</a>
+                <a href="#participa" class="nav-link" title="Participa">✨ Participa</a>
+                <a href="#musicos" class="nav-link" title="Músicos">🎻 Músicos</a>
+                <a href="#eventos" class="nav-link" title="Eventos">🎟️ Eventos</a>
+                <a href="#galeria" class="nav-link" title="Galería">📸 Galería</a>
+                <a href="#comentarios" class="nav-link" title="Comentarios">💬 Comentarios</a>
+                <a href="#restaurante" class="nav-link" title="Restaurante">🍽️ Restaurante</a>
+                <a href="#contacto" class="nav-link" title="Contacto">📞 Contacto</a>
             </div>
         </nav>
 
@@ -1043,13 +1064,9 @@
             </div>
         </header>
 
-        <!-- Current Song Display (Hidden by default, shown when a song is active) -->
-        <section id="current-song-display" class="section hidden">
-            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">¡Ahora Sonando! 🎶</h2>
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <p class="text-center text-gray-600">No hay canción activa en este momento. ¡Espera a que el administrador inicie una!</p>
-            </div>
-        </section>
+        <!-- The 'current-song-display' section is removed from here as per user request -->
+        <!-- Its functionality is replaced by #now-playing-top-bar and #song-details-page -->
+
 
         <!-- Participate Section -->
         <section id="participa" class="section animate-slideInUp">
