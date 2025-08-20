@@ -8,6 +8,289 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, onSnapshot, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase instances (will be initialized below)
+        let app;
+        let db;
+        let auth;
+        let userId; // For Firestore security rules
+        let isFirebaseInitialized = false; // Flag to ensure Firebase is fully set up before operations
+        let currentSongListenerUnsubscribe = null; // To manage the listener lifecycle for current song
+        let adminSongsListenerUnsubscribe = null; // To manage the listener lifecycle for admin songs
+
+        // Firebase configuration (provided by Canvas runtime)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Use provided app ID
+        
+        // Function to determine and render view based on URL hash and auth state
+        function updateView(user) {
+            const adminPanel = document.getElementById('admin-panel');
+            const mainContent = document.getElementById('main-content');
+            const loginFormContainer = document.getElementById('login-form-container');
+            const adminEmailDisplay = document.getElementById('admin-email-display');
+
+            let isAuthenticatedAsAdmin = user && user.email === 'admin@example.com';
+
+            // Unsubscribe existing listeners to avoid duplicates or incorrect data access
+            if (currentSongListenerUnsubscribe) {
+                currentSongListenerUnsubscribe();
+                currentSongListenerUnsubscribe = null;
+            }
+            if (adminSongsListenerUnsubscribe) {
+                adminSongsListenerUnsubscribe();
+                adminSongsListenerUnsubscribe = null;
+            }
+
+            if (window.location.hash === '#admin') {
+                if (isAuthenticatedAsAdmin) {
+                    loginFormContainer.classList.add('hidden');
+                    adminPanel.classList.remove('hidden');
+                    mainContent.classList.remove('hidden'); // Show main content (including admin panel at bottom)
+                    adminEmailDisplay.textContent = user.email;
+                    if (isFirebaseInitialized) {
+                        adminSongsListenerUnsubscribe = setupAdminSongsListener(); // Setup admin listener
+                    }
+                } else {
+                    // On #admin page but not authenticated as admin (or not authenticated at all)
+                    loginFormContainer.classList.remove('hidden'); // Show login form
+                    adminPanel.classList.add('hidden');
+                    mainContent.classList.add('hidden'); // Hide main content
+                    document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
+                    document.getElementById('login-message').classList.remove('text-green-600');
+                    document.getElementById('login-message').classList.add('text-red-600');
+                }
+            } else {
+                // Public view
+                loginFormContainer.classList.add('hidden');
+                adminPanel.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                if (isFirebaseInitialized) {
+                    currentSongListenerUnsubscribe = setupCurrentSongListener(); // Setup public listener
+                }
+            }
+            console.log("View updated based on auth state and hash. User:", user ? user.uid : 'null', "Hash:", window.location.hash);
+        }
+
+        // Initialize Firebase
+        if (Object.keys(firebaseConfig).length > 0) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            isFirebaseInitialized = true; // Set flag once initialized
+
+            onAuthStateChanged(auth, async (user) => {
+                if (!user) { // If no user is signed in
+                    userId = 'anonymous'; // Set a generic ID for anonymous operations
+                    // Attempt anonymous sign-in to ensure a user object for public reads if rules require it
+                    try {
+                        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Error during anonymous sign-in:", error);
+                        // If anonymous sign-in fails, proceed with user as null,
+                        // and updateView will handle hiding admin/showing public.
+                        // Public reads will rely on `allow read: if true`.
+                    }
+                } else {
+                    userId = user.uid; // Set actual user ID
+                }
+                updateView(user); // Call updateView AFTER auth state is determined
+            });
+
+            // Listen for hash changes to switch views without full page reload
+            window.addEventListener('hashchange', () => updateView(auth.currentUser));
+
+            // Initial view setup when Firebase is ready (important for first load)
+            // This will be re-evaluated by onAuthStateChanged but helps ensure initial state
+            updateView(auth.currentUser);
+
+        } else {
+            console.error("Firebase config not found. Please ensure __firebase_config is set.");
+            document.getElementById('login-message').textContent = "Error: Firebase no configurado. Consulta la consola para detalles.";
+        }
+
+        // Admin Login
+        document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('admin-email').value;
+            const password = document.getElementById('admin-password').value;
+            const loginMessage = document.getElementById('login-message');
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                loginMessage.textContent = 'Inicio de sesión exitoso.';
+                loginMessage.classList.remove('text-red-600');
+                loginMessage.classList.add('text-green-600');
+                // The onAuthStateChanged listener will handle showing the admin panel
+            } catch (error) {
+                console.error("Error al iniciar sesión:", error);
+                loginMessage.textContent = `Error: ${error.message}`;
+                loginMessage.classList.remove('text-green-600');
+                loginMessage.classList.add('text-red-600');
+            }
+        });
+
+        // Admin Logout
+        document.getElementById('logout-button')?.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                console.log("Sesión cerrada correctamente.");
+                // After logout, show the login form for admin hash, or main content for public hash
+                updateView(null); // Re-evaluate view with null user
+                document.getElementById('login-message').textContent = ''; // Clear login message
+            } catch (error) {
+                console.error("Error al cerrar sesión:", error);
+            }
+        });
+
+        // Add Song to Firestore (Admin Functionality)
+        document.getElementById('add-song-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('song-title').value;
+            const description = document.getElementById('song-description').value;
+            const imageUrl = document.getElementById('song-image-url').value;
+            const addSongMessage = document.getElementById('add-song-message');
+
+            if (!db) {
+                addSongMessage.textContent = 'Error: Firebase Firestore no inicializado.';
+                addSongMessage.classList.remove('text-green-600');
+                addSongMessage.classList.add('text-red-600');
+                return;
+            }
+
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/songs`), {
+                    title: title,
+                    description: description,
+                    imageUrl: imageUrl,
+                    createdAt: new Date()
+                });
+                addSongMessage.textContent = 'Canción añadida con éxito!';
+                addSongMessage.classList.remove('text-red-600');
+                addSongMessage.classList.add('text-green-600');
+                e.target.reset(); // Clear form
+            } catch (error) {
+                console.error("Error adding song:", error);
+                addSongMessage.textContent = `Error al añadir canción: ${error.message}`;
+                addSongMessage.classList.remove('text-green-600');
+                addSongMessage.classList.add('text-red-600');
+            }
+            setTimeout(() => addSongMessage.classList.add('hidden'), 3000);
+            addSongMessage.classList.remove('hidden');
+        });
+
+        // Setup Admin Songs Listener (Real-time updates)
+        function setupAdminSongsListener() {
+            // Check if db is initialized and if auth.currentUser exists and is admin before attaching snapshot listener
+            if (!db || !auth.currentUser || auth.currentUser.email !== 'admin@example.com') {
+                const songsListContainer = document.getElementById('admin-songs-list');
+                if (songsListContainer) songsListContainer.innerHTML = '<p class="text-center text-gray-400">Acceso no autorizado para ver canciones.</p>';
+                return null;
+            }
+
+            const songsListContainer = document.getElementById('admin-songs-list');
+            if (!songsListContainer) return null;
+
+            // Return the unsubscribe function
+            return onSnapshot(collection(db, `artifacts/${appId}/songs`), (snapshot) => {
+                songsListContainer.innerHTML = ''; // Clear previous list
+                if (snapshot.empty) {
+                    songsListContainer.innerHTML = '<p class="text-center text-gray-400">No hay canciones añadidas. Usa el formulario de arriba.</p>';
+                }
+                snapshot.forEach((doc) => {
+                    const song = doc.data();
+                    const songId = doc.id;
+                    const songItem = document.createElement('div');
+                    songItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-md shadow-sm mb-2';
+                    songItem.innerHTML = `
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-gray-800">${song.title}</h4>
+                            <p class="text-sm text-gray-600">${song.description}</p>
+                        </div>
+                        <button data-song-id="${songId}" class="set-current-song-btn btn-primary ml-4 text-sm px-3 py-1">Activar</button>
+                    `;
+                    songsListContainer.appendChild(songItem);
+                });
+
+                // Add event listeners to "Activar" buttons
+                document.querySelectorAll('.set-current-song-btn').forEach(button => {
+                    button.onclick = async (event) => {
+                        const songId = event.target.dataset.songId;
+                        if (!db) return; // Ensure db is initialized
+                        try {
+                            await setDoc(doc(db, `artifacts/${appId}/app_state/current_song`), {
+                                cancionActualId: songId,
+                                lastUpdated: new Date()
+                            });
+                            console.log(`Canción actual establecida a: ${songId}`);
+                        } catch (error) {
+                            console.error("Error setting current song:", error);
+                        }
+                    };
+                });
+            }, (error) => {
+                console.error("Error listening to admin songs:", error);
+                songsListContainer.innerHTML = `<p class="text-center text-red-400">Error al cargar canciones: ${error.message}</p>`;
+            });
+        }
+
+        // Setup Current Song Listener for Users (Real-time updates)
+        function setupCurrentSongListener() {
+            if (!db) return null;
+
+            const currentSongDisplay = document.getElementById('current-song-display');
+            if (!currentSongDisplay) return null; // Ensure element exists
+
+            // Listen for changes in the 'current_song' document
+            return onSnapshot(doc(db, `artifacts/${appId}/app_state/current_song`), async (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    const currentSongState = docSnapshot.data();
+                    const cancionActualId = currentSongState.cancionActualId;
+
+                    if (cancionActualId) {
+                        // Fetch details of the current song
+                        const songDoc = await getDoc(doc(db, `artifacts/${appId}/songs/${cancionActualId}`));
+                        if (songDoc.exists()) {
+                            const song = songDoc.data();
+                            currentSongDisplay.classList.remove('hidden'); // Show the section
+                            currentSongDisplay.innerHTML = `
+                                <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 animate-fadeIn">
+                                    <div class="md:w-1/3">
+                                        <img src="${song.imageUrl}" onerror="this.onerror=null; this.src='https://placehold.co/300x200/cccccc/333333?text=Imagen+No+Disponible';" alt="${song.title}" class="rounded-lg shadow-md w-full h-auto object-cover">
+                                    </div>
+                                    <div class="md:w-2/3 text-center md:text-left">
+                                        <p class="text-sm text-gold-600 font-bold mb-1">¡Ahora Sonando!</p>
+                                        <h3 class="text-3xl font-extrabold text-gray-900 mb-2">${song.title}</h3>
+                                        <p class="text-gray-700">${song.description}</p>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            currentSongDisplay.classList.add('hidden'); // Hide if song not found
+                            console.warn("Current song ID exists but song details not found:", cancionActualId);
+                        }
+                    } else {
+                        currentSongDisplay.classList.add('hidden'); // Hide if no current song ID
+                    }
+                } else {
+                    currentSongDisplay.classList.add('hidden'); // Hide if 'current_song' document doesn't exist
+                    console.log("No current song state document found.");
+                }
+            }, (error) => {
+                console.error("Error listening to current song state:", error);
+                currentSongDisplay.classList.add('hidden'); // Hide on error
+            });
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -23,7 +306,7 @@
         }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f3ed; /* Soft cream background */
+            background-color: #000; /* Fondo negro para el body */
             color: #333;
             overflow-x: hidden; /* Prevent horizontal scrolling */
             padding-top: 64px; /* Añadido padding al body para evitar que el contenido sea ocultado por el navbar fijo */
@@ -100,6 +383,9 @@
             padding: 2rem 1rem;
             margin: 0 auto;
             max-width: 900px;
+            background-color: #f7f3ed; /* Fondo crema para las secciones de contenido */
+            border-radius: 0.75rem; /* Asegura bordes redondeados si la sección no es de ancho completo */
+            margin-bottom: 2rem; /* Espacio entre secciones */
         }
         .card {
             background-color: #fff;
@@ -330,14 +616,6 @@
             .hamburger {
                 display: block;
             }
-            .header-bg {
-                height: 300px;
-            }
-            .header-content img {
-                width: auto;
-                height: 100px; /* Adjusted for smaller screens */
-                margin-bottom: 1.5rem; /* Adjusted for smaller screens */
-            }
             .header-content h1 {
                 font-size: 2.5rem;
             }
@@ -369,427 +647,288 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- Navbar -->
-    <nav class="navbar flex items-center relative z-50 justify-between md:justify-center">
-        <button id="hamburger" class="text-white text-2xl focus:outline-none md:hidden">
-            <i class="fas fa-bars"></i>
-        </button>
-        <div id="navbar-menu" class="navbar-menu md:flex md:items-center md:space-x-4">
-            <a href="#participa" class="nav-link">✨</a>
-            <a href="#musicos" class="nav-link">🎻</a>
-            <a href="#eventos" class="nav-link">🎟️</a>
-            <a href="#galeria" class="nav-link">📸</a>
-            <a href="#comentarios" class="nav-link">💬</a>
-            <a href="#restaurante" class="nav-link">🍽️</a>
-            <a href="#contacto" class="nav-link">📞</a>
-        </div>
-    </nav>
-
-    <!-- Header Section -->
-    <header class="header-bg relative">
-        <div class="header-content p-4 animate-fadeIn">
-            <!-- Logo del proyecto -->
-            <img src="https://i.ibb.co/vCCg9PWs/Gemini-Generated-Image-nrlxdinrlxdinrlx.png" alt="La Mesa Acústica Logo" class="mx-auto">
-            <h1 class="text-5xl font-extrabold mb-2 leading-tight">La Mesa Acústica</h1>
-            <p class="text-xl italic font-light">"Una experiencia gastronómica que se siente, se escucha y se vive."</p>
-        </div>
-    </header>
-
-    <!-- Participate Section -->
-    <section id="participa" class="section animate-slideInUp">
-        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Participa en el Concierto ✨</h2>
-        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h3 class="text-2xl font-semibold mb-4 text-gray-800">¡Vota por tu Pieza Favorita! 🎶</h3>
-            <p class="mb-4 text-gray-700">Tu voz cuenta. Ayúdanos a elegir la próxima melodía que tocará el ensamble esta noche.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <button class="vote-option-btn text-lg" data-vote="1">Vals de la Luz de Luna</button>
-                <button class="vote-option-btn text-lg" data-vote="2">Bolero Apasionado</button>
-                <button class="vote-option-btn text-lg" data-vote="3">Jazz Nocturno</button>
-                <button class="vote-option-btn text-lg" data-vote="4">Fantasía Celta</button>
-            </div>
-            <button id="submitVoteBtn" class="btn-primary w-full text-center">Enviar mi Voto</button>
-            <p id="voteMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Gracias por tu voto! 🎉</p>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-2xl font-semibold mb-4 text-gray-800">Comparte tu Experiencia 💖</h3>
-            <p class="mb-4 text-gray-700">¿Cómo te hace sentir la música? ¿Qué emociones evoca? Comparte tus comentarios y experiencias relacionadas con la temática del concierto. (Tus comentarios se leerán anónimamente)</p>
-            <textarea id="commentInput" class="input-field mb-4 h-32" placeholder="Escribe tu comentario aquí..."></textarea>
-            <button id="submitCommentBtn" class="btn-primary w-full text-center">Enviar Comentario</button>
-            <p id="commentMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Comentario enviado! Gracias por compartir. ✨</p>
-            <div class="mt-6 flex justify-center space-x-4">
-                <button class="social-share-btn" onclick="shareOnSocial('facebook')"><i class="fab fa-facebook-f"></i></button>
-                <button class="social-share-btn" onclick="shareOnSocial('twitter')"><i class="fab fa-twitter"></i></button>
-                <button class="social-share-btn" onclick="shareOnSocial('instagram')"><i class="fab fa-instagram"></i></button>
-            </div>
-        </div>
-    </section>
-
-    <!-- Middle Parallax Section -->
-    <section class="middle-parallax-section">
-        "Donde cada nota cuenta una historia."
-    </section>
-
-    <!-- Musicians Section -->
-    <section id="musicos" class="section animate-slideInUp">
-        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Nuestros Músicos & Narradora 🎻</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Violinista -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/7JMYCWVw/414867486-10232565539508056-4641127466506244359-n.jpg" alt="Violinista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Ricardo "Rola" Martínez</h3>
-                <p class="text-gray-600 mb-4">Violinista principal y arreglista. Con su pasión, Rola teje melodías que tocan el alma, explorando desde lo clásico hasta lo contemporáneo. 🌟</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Ricardo Martínez', 'Violinista principal y arreglista.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-            <!-- Cantante -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/HpVvkyZ7/Caro.jpg" alt="Cantante" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Carolina "Caro" Solís</h3>
-                <p class="text-gray-600 mb-4">Cantante principal. Su voz, una mezcla de dulzura y poder, te guiará a través de cada historia. 🎤</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Carolina Solís', 'Cantante principal.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-            <!-- Narradora -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/vCdB7QZZ/cinthia.jpg" alt="Narradora Cinthia" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Cinthia Garza</h3>
-                <p class="text-gray-600 mb-4">Narradora principal. Con su cautivadora voz, Cinthia te transportará a cada escena, haciendo que cada relato cobre vida. 🗣️</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Cinthia Garza', 'Narradora principal.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-            <!-- Pianista -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/tMzCC7dz/pianista.jpg" alt="Pianista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Fernando "Fer" García</h3>
-                <p class="text-gray-600 mb-4">Pianista y compositor. Las manos de Fer crean atmósferas mágicas que te sumergen en cada emoción. 🎹</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Fernando García', 'Pianista y compositor.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-            <!-- Saxofonista -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/0jBQBB0c/sax-azael.jpg" alt="Saxofonista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Antonio "Aza" Zazueta</h3>
-                <p class="text-gray-600 mb-4">Saxofonista principal. Con su sax, Aza añade un toque de sensualidad y sofisticación a cada pieza. 🎷</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Antonio Zazueta', 'Saxofonista principal.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-            <!-- Chelista -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/C5jHH4jy/marcello.jpg" alt="Chelista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Marcelo "Marcello" Ríos</h3>
-                <p class="text-gray-600 mb-4">Chelista, su cello aporta una profundidad y calidez inigualable al ensamble.🎶</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Marcelo Ríos', 'Chelista.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-            <!-- Percusionista -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/YBtkYswp/percusionista.jpg" alt="Percusionista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Jonathan "Johny" Pérez</h3>
-                <p class="text-gray-600 mb-4">Percusionista, el ritmo y la energía de Johny hacen vibrar cada rincón del escenario. 🥁</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Jonathan Pérez', 'Percusionista.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-            <!-- Arpista -->
-            <div class="card p-6 text-center">
-                <img src="https://i.ibb.co/VcCQYbDp/ariadna-ari-arpista.jpg" alt="Arpista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                <h3 class="text-xl font-semibold mb-2">Ariadna "Ari" Gómez</h3>
-                <p class="text-gray-600 mb-4">Arpista, sus melodías etéreas transportan a un mundo de ensueño y magia.💫</p>
-                <button class="social-share-btn mx-auto" onclick="shareMusician('Ariadna Gómez', 'Arpista.')"><i class="fas fa-share-alt"></i></button>
-            </div>
-        </div>
-    </section>
-
-    <!-- Upcoming Events Section -->
-    <section id="eventos" class="section animate-slideInUp">
-        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Próximos Eventos y Boletos 🎟️</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="card p-6">
-                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Noche de Cine y Emociones: Dramas Románticos</h3>
-                <p class="text-gray-700 mb-2"><i class="far fa-calendar-alt mr-2 text-gold-600"></i> Fecha: 20 de Septiembre, 2025</p>
-                <p class="text-gray-700 mb-2"><i class="far fa-clock mr-2 text-gold-600"></i> Hora: 8:00 PM</p>
-                <p class="text-gray-700 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Lugar: Restaurante Cornalina</p>
-                <p class="text-gray-700 mb-4">Sumérgete en historias de amor y pasión con las bandas sonoras más conmovedoras del cine.</p>
-                <a href="https://ejemplo.com/boletos-dramas" target="_blank" class="btn-primary w-full text-center block">Comprar Boletos</a>
-            </div>
-            <div class="card p-6">
-                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Una Velada con la Realeza: Estilo Bridgerton</h3>
-                <p class="text-gray-700 mb-2"><i class="far fa-calendar-alt mr-2 text-gold-600"></i> Fecha: 18 de Octubre, 2025</p>
-                <p class="text-gray-700 mb-2"><i class="far fa-clock mr-2 text-gold-600"></i> Hora: 8:00 PM</p>
-                <p class="text-700 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Lugar: Restaurante Cornalina</p>
-                <p class="text-gray-700 mb-4">Déjate llevar por la intriga y el romance de la Regencia, con la música de la famosa serie.</p>
-                <a href="https://ejemplo.com/boletos-bridgerton" target="_blank" class="btn-primary w-full text-center block">Comprar Boletos</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Photo Gallery Section -->
-    <section id="galeria" class="section animate-slideInUp">
-        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Galería de Momentos 📸</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <img src="https://i.ibb.co/L3rbLkR/Gemini-Generated-Image-9487oa9487oa9487.png" alt="Músicos en Cornalina 1" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
-            <img src="https://i.ibb.co/gb12gW70/Gemini-Generated-Image-cp2doncp2doncp2d.png" alt="Músicos en Cornalina 2" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
-            <img src="https://i.ibb.co/qYtgnsJM/Gemini-Generated-Image-3rpdk13rpdk13rpd.png" alt="Músicos en Cornalina 3" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
-            <img src="https://i.ibb.co/Fb41923g/Gemini-Generated-Image-l5hr1tl5hr1tl5hr.png" alt="Músicos en Cornalina 4" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
-            <img src="https://i.ibb.co/VWZrqkpD/Gemini-Generated-Image-vi1ca4vi1ca4vi1c.png" alt="Músicos en Cornalina 5" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
-            <img src="https://i.ibb.co/WWgjX1v7/Gemini-Generated-Image-jbkt3ijbkt3ijbkt.png" alt="Músicos en Cornalina 6" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
-        </div>
-    </section>
-
-    <!-- Past Comments Section -->
-    <section id="comentarios" class="section animate-slideInUp">
-        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Lo que Dicen Nuestros Invitados 💬</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Comment 1 -->
-            <div class="card p-6">
-                <div class="flex items-center mb-4">
-                    <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=JP" alt="Comensal JP" class="w-12 h-12 rounded-full mr-4 object-cover">
-                    <div>
-                        <p class="font-semibold text-gray-800">Juan Pérez</p>
-                        <div class="text-yellow-500 text-sm"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
-                    </div>
-                </div>
-                <p class="text-gray-700">"Una experiencia mágica. La música en vivo y la comida crearon una atmósfera inolvidable. ¡Volveremos pronto!" ✨</p>
-            </div>
-            <!-- Comment 2 -->
-            <div class="card p-6">
-                <div class="flex items-center mb-4">
-                    <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=AM" alt="Comensal AM" class="w-12 h-12 rounded-full mr-4 object-cover">
-                    <div>
-                        <p class="font-semibold text-gray-800">Ana María</p>
-                        <div class="text-yellow-500 text-sm"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i></div>
-                    </div>
-                </div>
-                <p class="text-gray-700">"Me encantó la interacción con la app para votar. Hizo que el concierto se sintiera muy personal. ¡Gran idea!" 📱</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Contact Section -->
-    <section id="contacto" class="section animate-slideInUp">
-        <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Contacto Dolce Ensamble 📞</h2>
-        <div class="bg-white p-6 rounded-xl shadow-lg text-center">
-            <p class="text-gray-700 mb-4">¡Nos encantaría ser parte de tu próximo evento especial! Contáctanos para bodas, eventos sociales o corporativos.</p>
-            <p class="text-gray-800 font-semibold text-lg mb-2"><i class="fas fa-envelope mr-2 text-gold-600"></i> info@dolceensamble.com</p>
-            <p class="text-gray-800 font-semibold text-lg mb-4"><i class="fas fa-phone mr-2 text-gold-600"></i> +52 (81) 1234 5678</p>
-            <div class="flex justify-center space-x-4">
-                <a href="https://www.instagram.com/dolceensamble/" target="_blank" class="social-share-btn"><i class="fab fa-instagram"></i></a>
-                <a href="https://www.facebook.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-facebook-f"></i></a>
-                <a href="https://www.youtube.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-youtube"></i></a>
-            </div>
-            <!-- YouTube Video Embed -->
-            <div class="video-container mt-6">
-                <iframe
-                    src="https://www.youtube.com/embed/E5mmd7eRJ14"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
-            </div>
-        </div>
-    </section>
-
-    <!-- Satisfaction Survey Modal -->
-    <div id="satisfactionModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" onclick="closeModal()">&times;</span>
-            <h3 class="text-2xl font-semibold mb-4 text-gray-800 text-center">Encuesta de Satisfacción ✅</h3>
-            <p class="mb-4 text-gray-700 text-center">Ayúdanos a mejorar tu experiencia. ¡Tu opinión es muy valiosa!</p>
-            <form id="satisfactionForm" class="space-y-4">
+    <!-- Login Form Container (Initially visible for #admin hash, hidden otherwise) -->
+    <div id="login-form-container" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[200] hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full text-center">
+            <h2 class="text-3xl font-bold mb-6 text-gray-900">Acceso de Administrador</h2>
+            <form id="login-form" class="space-y-4">
                 <div>
-                    <label for="rating" class="block text-gray-700 font-medium mb-2">¿Qué tan satisfecho estás con la experiencia general?</label>
-                    <select id="rating" class="input-field" required>
-                        <option value="">Selecciona una calificación</option>
-                        <option value="5">Excelente (5 estrellas)</option>
-                        <option value="4">Muy Bien (4 estrellas)</option>
-                        <option value="3">Bueno (3 estrellas)</option>
-                        <option value="2">Regular (2 estrellas)</option>
-                        <option value="1">Malo (1 estrella)</option>
-                    </select>
+                    <input type="email" id="admin-email" placeholder="Correo Electrónico" class="input-field" required value="admin@example.com">
                 </div>
                 <div>
-                    <label for="comments_survey" class="block text-gray-700 font-medium mb-2">Comentarios adicionales:</label>
-                    <textarea id="comments_survey" class="input-field h-24" placeholder="¿Qué te gustó más? ¿Qué podríamos mejorar?"></textarea>
+                    <input type="password" id="admin-password" placeholder="Contraseña" class="input-field" required value="password123">
                 </div>
-                <button type="submit" class="btn-primary w-full text-center">Enviar Encuesta</button>
-                <p id="surveyMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Encuesta enviada! ¡Muchas gracias! 😊</p>
+                <button type="submit" class="btn-primary w-full">Iniciar Sesión</button>
+                <p id="login-message" class="mt-4 text-red-600"></p>
             </form>
         </div>
     </div>
 
-    <!-- WhatsApp Floating Button -->
-    <a href="https://wa.me/528110474854" class="whatsapp-float" target="_blank">
-        <i class="fab fa-whatsapp"></i>
-    </a>
+    <!-- Admin Panel (Hidden by default, shown after admin login for #admin hash) -->
+    <div id="admin-panel" class="hidden fixed inset-x-0 bottom-0 bg-gray-800 text-white p-4 z-50 shadow-lg">
+        <div class="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center">
+            <p class="text-sm md:text-base mb-2 md:mb-0">Administrador: <span id="admin-email-display" class="font-semibold"></span></p>
+            <div class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
+                <!-- Add New Song Form -->
+                <form id="add-song-form" class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
+                    <input type="text" id="song-title" placeholder="Título Canción" class="input-field text-gray-900 text-sm md:w-32" required>
+                    <input type="text" id="song-description" placeholder="Descripción" class="input-field text-gray-900 text-sm md:w-32" required>
+                    <input type="url" id="song-image-url" placeholder="URL Imagen" class="input-field text-gray-900 text-sm md:w-32" required>
+                    <button type="submit" class="btn-primary text-sm px-3 py-1 w-full md:w-auto">Añadir</button>
+                </form>
+                <button id="logout-button" class="btn-primary text-sm px-3 py-1 bg-red-600 hover:bg-red-700 w-full md:w-auto">Cerrar Sesión</button>
+            </div>
+        </div>
+        <p id="add-song-message" class="mt-2 text-center text-green-400 hidden"></p>
+        <div id="admin-songs-list" class="mt-4 max-h-48 overflow-y-auto p-2 bg-gray-700 rounded-md">
+            <!-- Songs will be loaded here by JavaScript -->
+            <p class="text-center text-gray-400">Cargando canciones...</p>
+        </div>
+    </div>
 
-    <!-- Floating Survey Button -->
-    <button id="floatingSurveyBtn" class="survey-float">
-        <i class="fas fa-clipboard-list"></i>
-    </button>
+    <!-- Main Content (Hidden initially, shown based on hash or after admin login) -->
+    <div id="main-content" class="hidden">
+        <!-- Navbar -->
+        <nav class="navbar flex items-center relative z-50 justify-between md:justify-center">
+            <button id="hamburger" class="text-white text-2xl focus:outline-none md:hidden">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div id="navbar-menu" class="navbar-menu md:flex md:items-center md:space-x-4">
+                <a href="#participa" class="nav-link" title="Participa en el Concierto">✨</a>
+                <a href="#musicos" class="nav-link" title="Nuestros Músicos y Narradora">🎻</a>
+                <a href="#eventos" class="nav-link" title="Próximos Eventos y Boletos">🎟️</a>
+                <a href="#galeria" class="nav-link" title="Galería de Momentos">📸</a>
+                <a href="#comentarios" class="nav-link" title="Comentarios de Invitados">💬</a>
+                <a href="#restaurante" class="nav-link" title="Sección del Restaurante">🍽️</a>
+                <a href="#contacto" class="nav-link" title="Contacto Dolce Ensamble">📞</a>
+            </div>
+        </nav>
 
-    <script>
-        // Smooth scrolling for navigation
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
-                // Close mobile menu if open
-                if (window.innerWidth <= 768) {
-                    document.getElementById('navbar-menu').classList.remove('open');
-                }
-            });
-        });
+        <!-- Header Section -->
+        <header class="header-bg relative">
+            <div class="header-content p-4 animate-fadeIn">
+                <!-- Logo del proyecto -->
+                <img src="https://i.ibb.co/HLhWzB00/Proyecto-de-video-4.gif" alt="La Mesa Acústica Logo" class="mx-auto">
+                <h1 class="text-5xl font-extrabold mb-2 leading-tight">La Mesa Acústica</h1>
+                <p class="text-xl italic font-light">"Una experiencia gastronómica que se siente, se escucha y se vive."</p>
+            </div>
+        </header>
 
-        // Hamburger menu functionality
-        const hamburger = document.getElementById('hamburger');
-        const navbarMenu = document.getElementById('navbar-menu');
-        hamburger.addEventListener('click', () => {
-            navbarMenu.classList.toggle('open');
-        });
+        <!-- Current Song Display (Hidden by default, shown when a song is active) -->
+        <section id="current-song-display" class="section hidden">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">¡Ahora Sonando! 🎶</h2>
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <p class="text-center text-gray-600">No hay canción activa en este momento. ¡Espera a que el administrador inicie una!</p>
+            </div>
+        </section>
 
-        // Voting mechanism
-        let selectedVote = null;
-        document.querySelectorAll('.vote-option-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                // Remove selected class from all buttons
-                document.querySelectorAll('.vote-option-btn').forEach(btn => btn.classList.remove('selected'));
-                // Add selected class to the clicked button
-                this.classList.add('selected');
-                selectedVote = this.dataset.vote;
-            });
-        });
+        <!-- Participate Section -->
+        <section id="participa" class="section animate-slideInUp">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Participa en el Concierto ✨</h2>
+            <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">¡Vota por tu Pieza Favorita! 🎶</h3>
+                <p class="mb-4 text-gray-700">Tu voz cuenta. Ayúdanos a elegir la próxima melodía que tocará el ensamble esta noche.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <button class="vote-option-btn text-lg" data-vote="1">Vals de la Luz de Luna</button>
+                    <button class="vote-option-btn text-lg" data-vote="2">Bolero Apasionado</button>
+                    <button class="vote-option-btn text-lg" data-vote="3">Jazz Nocturno</button>
+                    <button class="vote-option-btn text-lg" data-vote="4">Fantasía Celta</button>
+                </div>
+                <button id="submitVoteBtn" class="btn-primary w-full text-center">Enviar mi Voto</button>
+                <p id="voteMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Gracias por tu voto! 🎉</p>
+            </div>
 
-        document.getElementById('submitVoteBtn').addEventListener('click', function() {
-            const voteMessage = document.getElementById('voteMessage');
-            if (selectedVote) {
-                // In a real application, you would send selectedVote to a backend database (e.g., Firestore)
-                console.log('Voto enviado:', selectedVote);
-                voteMessage.textContent = '¡Gracias por tu voto! 🎉';
-                voteMessage.classList.remove('hidden');
-                setTimeout(() => {
-                    voteMessage.classList.add('hidden');
-                    document.querySelectorAll('.vote-option-btn').forEach(btn => btn.classList.remove('selected'));
-                    selectedVote = null;
-                }, 3000);
-            } else {
-                voteMessage.textContent = 'Por favor, selecciona una opción para votar.';
-                voteMessage.classList.remove('hidden');
-                voteMessage.classList.remove('text-green-600');
-                voteMessage.classList.add('text-red-600');
-                setTimeout(() => {
-                    voteMessage.classList.add('hidden');
-                    voteMessage.classList.remove('text-red-600');
-                    voteMessage.classList.add('text-green-600');
-                }, 3000);
-            }
-        });
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Comparte tu Experiencia 💖</h3>
+                <p class="mb-4 text-gray-700">¿Cómo te hace sentir la música? ¿Qué emociones evoca? Comparte tus comentarios y experiencias relacionadas con la temática del concierto. (Tus comentarios se leerán anónimamente)</p>
+                <textarea id="commentInput" class="input-field mb-4 h-32" placeholder="Escribe tu comentario aquí..."></textarea>
+                <button id="submitCommentBtn" class="btn-primary w-full text-center">Enviar Comentario</button>
+                <p id="commentMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Comentario enviado! Gracias por compartir. ✨</p>
+                <div class="mt-6 flex justify-center space-x-4">
+                    <button class="social-share-btn" onclick="shareOnSocial('facebook')"><i class="fab fa-facebook-f"></i></button>
+                    <button class="social-share-btn" onclick="shareOnSocial('twitter')"><i class="fab fa-twitter"></i></button>
+                    <button class="social-share-btn" onclick="shareOnSocial('instagram')"><i class="fab fa-instagram"></i></button>
+                </div>
+            </div>
+        </section>
 
-        // Comment submission
-        document.getElementById('submitCommentBtn').addEventListener('click', function() {
-            const commentInput = document.getElementById('commentInput');
-            const commentMessage = document.getElementById('commentMessage');
-            const comment = commentInput.value.trim();
-            if (comment) {
-                // In a real application, send comment to backend (e.g., Firestore)
-                console.log('Comentario enviado:', comment);
-                commentMessage.textContent = '¡Comentario enviado! Gracias por compartir. ✨';
-                commentMessage.classList.remove('hidden');
-                commentInput.value = ''; // Clear input
-                setTimeout(() => {
-                    commentMessage.classList.add('hidden');
-                }, 3000);
-            } else {
-                commentMessage.textContent = 'Por favor, escribe un comentario antes de enviar.';
-                commentMessage.classList.remove('hidden');
-                commentMessage.classList.add('text-red-600');
-                setTimeout(() => {
-                    commentMessage.classList.add('hidden');
-                    commentMessage.classList.remove('text-red-600');
-                    commentMessage.classList.add('text-green-600');
-                }, 3000);
-            }
-        });
+        <!-- Middle Parallax Section -->
+        <section class="middle-parallax-section">
+            "Donde cada nota cuenta una historia."
+        </section>
 
-        // Social sharing buttons (example functionality)
-        function shareOnSocial(platform) {
-            let shareText = "Estoy disfrutando de una experiencia increíble en 'La Mesa Acústica' en Cornalina. ¡Música, historias y sabores! #LaMesaAcustica #CornalinaMusic #ExperienciaSensorial";
-            let shareUrl = window.location.href; // URL of the current app
+        <!-- Musicians Section -->
+        <section id="musicos" class="section animate-slideInUp">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Nuestros Músicos & Narradora 🎻</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Narradora - Siempre la primera -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/vCdB7QZZ/cinthia.jpg" alt="Narradora Cinthia" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Cinthia Garza</h3>
+                    <p class="text-gray-600 mb-4">Narradora principal. Con su cautivadora voz, Cinthia te transportará a cada escena, haciendo que cada relato cobre vida. 🗣️</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Cinthia Garza', 'Narradora principal.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+                <!-- Cantante -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/HpVvkyZ7/Caro.jpg" alt="Cantante" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Carolina "Caro" Solís</h3>
+                    <p class="text-gray-600 mb-4">Cantante principal. Su voz, una mezcla de dulzura y poder, te guiará a través de cada historia. 🎤</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Carolina Solís', 'Cantante principal.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+                <!-- Saxofonista -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/0jBQBB0c/sax-azael.jpg" alt="Saxofonista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Antonio "Aza" Zazueta</h3>
+                    <p class="text-gray-600 mb-4">Saxofonista principal. Con su sax, Aza añade un toque de sensualidad y sofisticación a cada pieza. 🎷</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Antonio Zazueta', 'Saxofonista principal.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+                <!-- Arpista -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/VcCQYbDp/ariadna-ari-arpista.jpg" alt="Arpista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Ariadna "Ari" Gómez</h3>
+                    <p class="text-gray-600 mb-4">Arpista, sus melodías etéreas transportan a un mundo de ensueño y magia.💫</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Ariadna Gómez', 'Arpista.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+                <!-- Violinista -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/7JMYCWVw/414867486-10232565539508056-4641127466506244359-n.jpg" alt="Violinista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Ricardo "Rola" Martínez</h3>
+                    <p class="text-gray-600 mb-4">Violinista principal y arreglista. Con su pasión, Rola teje melodías que tocan el alma, explorando desde lo clásico hasta lo contemporáneo. 🌟</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Ricardo Martínez', 'Violinista principal y arreglista.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+                <!-- Percusionista -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/YBtkYswp/percusionista.jpg" alt="Percusionista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Jonathan "Johny" Pérez</h3>
+                    <p class="text-gray-600 mb-4">Percusionista, el ritmo y la energía de Johny hacen vibrar cada rincón del escenario. 🥁</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Jonathan Pérez', 'Percusionista.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+                <!-- Pianista -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/tMzCC7dz/pianista.jpg" alt="Pianista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Fernando "Fer" García</h3>
+                    <p class="text-gray-600 mb-4">Pianista y compositor. Las manos de Fer crean atmósferas mágicas que te sumergen en cada emoción. 🎹</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Fernando García', 'Pianista y compositor.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+                <!-- Chelista -->
+                <div class="card p-6 text-center">
+                    <img src="https://i.ibb.co/C5jHH4jy/marcello.jpg" alt="Chelista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Marcelo "Marcello" Ríos</h3>
+                    <p class="text-gray-600 mb-4">Chelista, su cello aporta una profundidad y calidez inigualable al ensamble.🎶</p>
+                    <button class="social-share-btn mx-auto" onclick="shareMusician('Marcelo Ríos', 'Chelista.')"><i class="fas fa-share-alt"></i></button>
+                </div>
+            </div>
+        </section>
 
-            if (platform === 'facebook') {
-                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank');
-            } else if (platform === 'twitter') {
-                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
-            } else if (platform === 'instagram') {
-                // Instagram sharing is complex for web apps. Usually involves native app or direct message.
-                // For a web app, you might just encourage copying a hashtag or text.
-                alert('Para compartir en Instagram, puedes copiar este texto y pegarlo en tu historia o publicación: \n\n' + shareText);
-            }
-        }
+        <!-- Upcoming Events Section -->
+        <section id="eventos" class="section animate-slideInUp">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Próximos Eventos y Boletos 🎟️</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-gray-800">Noche de Cine y Emociones: Dramas Románticos</h3>
+                    <p class="text-gray-700 mb-2"><i class="far fa-calendar-alt mr-2 text-gold-600"></i> Fecha: 20 de Septiembre, 2025</p>
+                    <p class="text-gray-700 mb-2"><i class="far fa-clock mr-2 text-gold-600"></i> Hora: 8:00 PM</p>
+                    <p class="text-gray-700 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Lugar: Restaurante Cornalina</p>
+                    <p class="text-gray-700 mb-4">Sumérgete en historias de amor y pasión con las bandas sonoras más conmovedoras del cine.</p>
+                    <a href="https://ejemplo.com/boletos-dramas" target="_blank" class="btn-primary w-full text-center block">Comprar Boletos</a>
+                </div>
+                <div class="card p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-gray-800">Una Velada con la Realeza: Estilo Bridgerton</h3>
+                    <p class="text-gray-700 mb-2"><i class="far fa-calendar-alt mr-2 text-gold-600"></i> Fecha: 18 de Octubre, 2025</p>
+                    <p class="text-gray-700 mb-2"><i class="far fa-clock mr-2 text-gold-600"></i> Hora: 8:00 PM</p>
+                    <p class="text-700 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Lugar: Restaurante Cornalina</p>
+                    <p class="text-gray-700 mb-4">Déjate llevar por la intriga y el romance de la Regencia, con la música de la famosa serie.</p>
+                    <a href="https://ejemplo.com/boletos-bridgerton" target="_blank" class="btn-primary w-full text-center block">Comprar Boletos</a>
+                </div>
+            </div>
+        </section>
 
-        function shareMusician(name, description) {
-            const textToShare = `Conoce a ${name} de La Mesa Acústica: ${description} #LaMesaAcustica #MúsicosCornalina`;
-            if (navigator.share) {
-                navigator.share({
-                    title: `Conoce a ${name}`,
-                    text: textToShare,
-                    url: window.location.href,
-                }).then(() => console.log('Contenido compartido con éxito'))
-                  .catch((error) => console.log('Error al compartir', error));
-            } else {
-                alert(`Puedes compartir sobre ${name} copiando este texto: \n\n${textToShare}`);
-            }
-        }
+        <!-- Photo Gallery Section -->
+        <section id="galeria" class="section animate-slideInUp">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Galería de Momentos 📸</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <img src="https://i.ibb.co/L3rbLkR/Gemini-Generated-Image-9487oa9487oa9487.png" alt="Músicos en Cornalina 1" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+                <img src="https://i.ibb.co/gb12gW70/Gemini-Generated-Image-cp2doncp2doncp2d.png" alt="Músicos en Cornalina 2" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+                <img src="https://i.ibb.co/qYtgnsJM/Gemini-Generated-Image-3rpdk13rpdk13rpd.png" alt="Músicos en Cornalina 3" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+                <img src="https://i.ibb.co/Fb41923g/Gemini-Generated-Image-l5hr1tl5hr1tl5hr.png" alt="Músicos en Cornalina 4" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+                <img src="https://i.ibb.co/VWZrqkpD/Gemini-Generated-Image-vi1ca4vi1ca4vi1c.png" alt="Músicos en Cornalina 5" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+                <img src="https://i.ibb.co/WWgjX1v7/Gemini-Generated-Image-jbkt3ijbkt3ijbkt.png" alt="Músicos en Cornalina 6" class="rounded-lg shadow-md w-full h-auto object-cover transform transition-transform duration-300 hover:scale-105">
+            </div>
+        </section>
 
-        // Modal for Satisfaction Survey
-        const satisfactionModal = document.getElementById('satisfactionModal');
-        const closeButton = document.querySelector('#satisfactionModal .close-button');
-        const floatingSurveyBtn = document.getElementById('floatingSurveyBtn'); // Floating button
+        <!-- Past Comments Section -->
+        <section id="comentarios" class="section animate-slideInUp">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Lo que Dicen Nuestros Invitados 💬</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Comment 1 -->
+                <div class="card p-6">
+                    <div class="flex items-center mb-4">
+                        <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=JP" alt="Comensal JP" class="w-12 h-12 rounded-full mr-4 object-cover">
+                        <div>
+                            <p class="font-semibold text-gray-800">Juan Pérez</p>
+                            <div class="text-yellow-500 text-sm"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                        </div>
+                    </div>
+                    <p class="text-gray-700">"Una experiencia mágica. La música en vivo y la comida crearon una atmósfera inolvidable. ¡Volveremos pronto!" ✨</p>
+                </div>
+                <!-- Comment 2 -->
+                <div class="card p-6">
+                    <div class="flex items-center mb-4">
+                        <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=AM" alt="Comensal AM" class="w-12 h-12 rounded-full mr-4 object-cover">
+                        <div>
+                            <p class="font-semibold text-gray-800">Ana María</p>
+                            <div class="text-yellow-500 text-sm"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i></div>
+                        </div>
+                    </div>
+                    <p class="text-gray-700">"Me encantó la interacción con la app para votar. Hizo que el concierto se sintiera muy personal. ¡Gran idea!" 📱</p>
+                </div>
+            </div>
+        </section>
 
+        <!-- Contact Section -->
+        <section id="contacto" class="section animate-slideInUp">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Contacto Dolce Ensamble 📞</h2>
+            <div class="bg-white p-6 rounded-xl shadow-lg text-center">
+                <p class="text-gray-700 mb-4">¡Nos encantaría ser parte de tu próximo evento especial! Contáctanos para bodas, eventos sociales o corporativos.</p>
+                <p class="text-gray-800 font-semibold text-lg mb-2"><i class="fas fa-envelope mr-2 text-gold-600"></i> info@dolceensamble.com</p>
+                <p class="text-gray-800 font-semibold text-lg mb-4"><i class="fas fa-phone mr-2 text-gold-600"></i> +52 (81) 1234 5678</p>
+                <div class="flex justify-center space-x-4">
+                    <a href="https://www.instagram.com/dolceensamble/" target="_blank" class="social-share-btn"><i class="fab fa-instagram"></i></a>
+                    <a href="https://www.facebook.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-facebook-f"></i></a>
+                    <a href="https://www.youtube.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-youtube"></i></a>
+                </div>
+                <!-- YouTube Video Embed -->
+                <div class="video-container mt-6">
+                    <iframe
+                        src="https://www.youtube.com/embed/E5mmd7eRJ14"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen>
+                    </iframe>
+                </div>
+            </div>
+        </section>
 
-        // Function to open the modal
-        function openModal() {
-            satisfactionModal.style.display = "flex";
-        }
+        <!-- Satisfaction Survey Modal -->
+        <div id="satisfactionModal" class="modal">
+            <div class="modal-content text-center">
+                <span class="close-button" onclick="closeModal()">&times;</span>
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Encuesta de Satisfacción ✅</h3>
+                <p class="mb-6 text-gray-700">Ayúdanos a mejorar tu experiencia. ¡Tu opinión es muy valiosa!</p>
+                <a href="https://forms.gle/98hgfrRA9TeTmrJX8" target="_blank" class="btn-primary w-full block text-center">Responder Encuesta</a>
+            </div>
+        </div>
 
-        // Function to close the modal
-        function closeModal() {
-            satisfactionModal.style.display = "none";
-        }
+        <!-- WhatsApp Floating Button -->
+        <a href="https://wa.me/528110474854" class="whatsapp-float" target="_blank">
+            <i class="fab fa-whatsapp"></i>
+        </a>
 
-        // Event listener for the floating survey button
-        floatingSurveyBtn.onclick = openModal; // Floating button to open modal
-        closeButton.onclick = closeModal;
+        <!-- Floating Survey Button -->
+        <button id="floatingSurveyBtn" class="survey-float">
+            <i class="fas fa-clipboard-list"></i>
+        </button>
+    </div> <!-- End of main-content -->
 
-        // Close modal when clicking outside of it
-        window.onclick = function(event) {
-            if (event.target == satisfactionModal) {
-                closeModal();
-            }
-        }
-
-        document.getElementById('satisfactionForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const rating = document.getElementById('rating').value;
-            const commentsSurvey = document.getElementById('comments_survey').value.trim();
-            const surveyMessage = document.getElementById('surveyMessage');
-
-            if (rating) {
-                console.log('Encuesta enviada:', { rating, commentsSurvey });
-                surveyMessage.textContent = '¡Encuesta enviada! ¡Muchas gracias! 😊';
-                surveyMessage.classList.remove('hidden');
-                this.reset(); // Clear the form
-                setTimeout(() => {
-                    surveyMessage.classList.add('hidden');
-                    closeModal();
-                }, 3000);
-            } else {
-                surveyMessage.textContent = 'Por favor, selecciona una calificación.';
-                surveyMessage.classList.remove('hidden');
-                surveyMessage.classList.remove('text-green-600');
-                surveyMessage.classList.add('text-red-600');
-                setTimeout(() => {
-                    surveyMessage.classList.add('hidden');
-                    surveyMessage.classList.remove('text-red-600');
-                    surveyMessage.classList.add('text-green-600');
-                }, 3000);
-            }
-        });
-
-    </script>
 </body>
 </html>
