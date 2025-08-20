@@ -20,13 +20,28 @@
         let auth;
         let userId; // For Firestore security rules
         let isFirebaseInitialized = false; // Flag to ensure Firebase is fully set up before operations
-        let currentSongListenerUnsubscribe = null; // To manage the listener lifecycle for current song
+        let currentSongListenerUnsubscribe = null; // To manage the listener lifecycle
         let adminSongsListenerUnsubscribe = null; // To manage the listener lifecycle for admin songs
 
-        // Firebase configuration (provided by Canvas runtime)
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Use provided app ID
-        
+        // =====================================================================================
+        // === IMPORTANTE: Reemplaza con tu configuración REAL de Firebase para GitHub Pages ===
+        // === NO USES ESTOS VALORES EN PRODUCCIÓN SIN CAMBIARLOS POR LOS TUYOS REALES ===
+        // =====================================================================================
+        const firebaseConfig = {
+              apiKey: "AIzaSyDiToXPpDhmu5b3RZI43BKJwgixue9tbzs",
+              authDomain: "la-mesa-acustica-app.firebaseapp.com",
+              projectId: "la-mesa-acustica-app",
+              storageBucket: "la-mesa-acustica-app.firebasestorage.app",
+              messagingSenderId: "377337289611",
+              appId: "1:377337289611:web:8693eee405c9ace50bed8e"
+        };
+        // Para el appId en rutas de Firestore, usaremos el projectId que es único y estable
+        const appId = firebaseConfig.projectId; // Usar el projectId como appId para las rutas de Firestore
+        // =====================================================================================
+        // === FIN DE LA CONFIGURACIÓN REAL DE FIREBASE ===
+        // =====================================================================================
+
+
         // Function to determine and render view based on URL hash and auth state
         function updateView(user) {
             const adminPanel = document.getElementById('admin-panel');
@@ -77,23 +92,30 @@
         }
 
         // Initialize Firebase
-        if (Object.keys(firebaseConfig).length > 0) {
+        // Solo inicializamos si la configuración no está vacía.
+        if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey !== "TU_API_KEY_AQUI") { // Added check for placeholder
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
             isFirebaseInitialized = true; // Set flag once initialized
 
             onAuthStateChanged(auth, async (user) => {
+                // Clear existing listeners to prevent multiple subscriptions or issues during state changes
+                if (currentSongListenerUnsubscribe) {
+                    currentSongListenerUnsubscribe();
+                    currentSongListenerUnsubscribe = null;
+                }
+                if (adminSongsListenerUnsubscribe) {
+                    adminSongsListenerUnsubscribe();
+                    adminSongsListenerUnsubscribe = null;
+                }
+
                 if (!user) { // If no user is signed in
                     userId = 'anonymous'; // Set a generic ID for anonymous operations
                     // Attempt anonymous sign-in to ensure a user object for public reads if rules require it
                     try {
-                        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
+                        // We do NOT use __initial_auth_token here as it's Canvas-specific
+                        await signInAnonymously(auth);
                     } catch (error) {
                         console.error("Error during anonymous sign-in:", error);
                         // If anonymous sign-in fails, proceed with user as null,
@@ -114,8 +136,13 @@
             updateView(auth.currentUser);
 
         } else {
-            console.error("Firebase config not found. Please ensure __firebase_config is set.");
-            document.getElementById('login-message').textContent = "Error: Firebase no configurado. Consulta la consola para detalles.";
+            console.error("Firebase config not found or is still placeholder. Please replace 'TU_API_KEY_AQUI' and other placeholders with your actual Firebase config.");
+            document.getElementById('login-message').textContent = "Error: Firebase no configurado. Asegúrate de reemplazar los datos de configuración.";
+             // Ensure main content is visible even if Firebase init fails for some reason,
+             // so the user doesn't just see a blank page.
+             document.getElementById('main-content').classList.remove('hidden');
+             document.getElementById('login-form-container').classList.add('hidden');
+             document.getElementById('admin-panel').classList.add('hidden');
         }
 
         // Admin Login
@@ -124,6 +151,13 @@
             const email = document.getElementById('admin-email').value;
             const password = document.getElementById('admin-password').value;
             const loginMessage = document.getElementById('login-message');
+
+            if (!auth) {
+                loginMessage.textContent = 'Error: Firebase Auth no inicializado.';
+                loginMessage.classList.remove('text-green-600');
+                loginMessage.classList.add('text-red-600');
+                return;
+            }
 
             try {
                 await signInWithEmailAndPassword(auth, email, password);
