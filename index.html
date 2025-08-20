@@ -23,6 +23,7 @@
         let currentSongListenerUnsubscribe = null;
         let adminSongsListenerUnsubscribe = null;
         let adminCommentsListenerUnsubscribe = null;
+        let currentSongData = null; // Variable para almacenar la información de la canción actual
 
         // Firebase configuration (REEMPLAZA ESTO CON TUS VALORES REALES DE FIREBASE)
         const firebaseConfig = {
@@ -72,8 +73,9 @@
         function updateView(user) {
             const mainContent = document.getElementById('main-content');
             const loginFormContainer = document.getElementById('login-form-container');
-            const adminDashboard = document.getElementById('admin-dashboard'); // Nuevo panel de administración
+            const adminDashboard = document.getElementById('admin-dashboard');
             const adminEmailDisplay = document.getElementById('admin-email-display');
+            const songDetailsPage = document.getElementById('song-details-page'); // Nueva página de detalles de canción
 
             let isAuthenticatedAsAdmin = user && user.email === 'admin@example.com';
 
@@ -91,28 +93,41 @@
                 adminCommentsListenerUnsubscribe = null;
             }
 
-            // Ocultar todos los contenedores por defecto al inicio de cada updateView
+            // Ocultar todos los contenedores al inicio de cada updateView
             mainContent.classList.add('hidden');
             loginFormContainer.classList.add('hidden');
             adminDashboard.classList.add('hidden');
+            songDetailsPage.classList.add('hidden');
 
             if (window.location.hash === '#admin') {
                 if (isAuthenticatedAsAdmin) {
-                    // Admin logueado en vista admin
                     adminDashboard.classList.remove('hidden'); // Mostrar panel admin
                     adminEmailDisplay.textContent = user.email;
                     if (isFirebaseInitialized) {
                         adminSongsListenerUnsubscribe = setupAdminSongsListener();
-                        adminCommentsListenerUnsubscribe = setupAdminCommentsListener(); // Setup comments listener
+                        adminCommentsListenerUnsubscribe = setupAdminCommentsListener();
                     }
                 } else {
-                    // No admin o no logueado en vista admin
                     loginFormContainer.classList.remove('hidden'); // Mostrar formulario de login
                     document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
                     document.getElementById('login-message').classList.remove('text-green-600');
                     document.getElementById('login-message').classList.add('text-red-600');
                 }
-            } else {
+            } else if (window.location.hash === '#song-details') {
+                // Mostrar página de detalles de canción
+                songDetailsPage.classList.remove('hidden');
+                // Se necesita que currentSongData ya esté cargado para mostrar detalles
+                if (currentSongData) {
+                    displaySongDetails(currentSongData);
+                } else {
+                    // Fallback: si se accede directamente a #song-details sin pasar por main-content,
+                    // intentar cargar la canción actual.
+                    if (isFirebaseInitialized) {
+                         setupCurrentSongListener(true); // Pasar true para forzar la actualización de detalles
+                    }
+                }
+            }
+            else {
                 // Vista pública
                 mainContent.classList.remove('hidden'); // Mostrar contenido principal
                 if (isFirebaseInitialized) {
@@ -130,7 +145,6 @@
             isFirebaseInitialized = true;
 
             onAuthStateChanged(auth, async (user) => {
-                // No need to clear listeners here, updateView already handles it.
                 if (!user) {
                     userId = 'anonymous';
                     try {
@@ -150,8 +164,7 @@
         } else {
             console.error("Firebase config not found or is still placeholder. Please replace 'TU_API_KEY_AQUI' and other placeholders with your actual Firebase config.");
             document.getElementById('login-message').textContent = "Error: Firebase no configurado. Asegúrate de reemplazar los datos de configuración.";
-            // If Firebase init fails, still attempt to show main content to avoid blank page
-            document.getElementById('main-content').classList.remove('hidden');
+            document.getElementById('main-content').classList.remove('hidden'); // Fallback: show main content
         }
 
         // Admin Login
@@ -172,6 +185,7 @@
                 loginMessage.textContent = 'Inicio de sesión exitoso.';
                 loginMessage.classList.remove('text-red-600');
                 loginMessage.classList.add('text-green-600');
+                // updateView will be called by onAuthStateChanged after successful login
             } catch (error) {
                 console.error("Error al iniciar sesión:", error);
                 loginMessage.textContent = `Error: ${error.message}`;
@@ -185,7 +199,8 @@
             try {
                 await signOut(auth);
                 console.log("Sesión cerrada correctamente.");
-                updateView(null);
+                window.location.hash = ''; // Redirigir a la vista pública
+                // updateView will be called by onAuthStateChanged after logout
                 document.getElementById('login-message').textContent = '';
             } catch (error) {
                 console.error("Error al cerrar sesión:", error);
@@ -251,8 +266,8 @@
         async function deleteSong(songId) {
             if (!db) return;
             // Usar una confirmación de modal UI en lugar de alert/confirm
-            const confirmDelete = true; // Por ahora asume true, idealmente un modal de confirmación
-            if (confirmDelete) {
+            // Por simplicidad, aquí se asume la confirmación, pero idealmente sería un modal personalizado.
+            if (confirm("¿Estás seguro de que quieres eliminar esta canción?")) { // Usando confirm para la demo
                 try {
                     await deleteDoc(doc(db, `artifacts/${appId}/songs/${songId}`));
                     console.log(`Canción eliminada: ${songId}`);
@@ -338,7 +353,8 @@
         }
 
         // Setup Current Song Listener for Users (Real-time updates)
-        function setupCurrentSongListener() {
+        // forceDetailsUpdate: if true, will also update the #song-details-page if it's currently visible
+        function setupCurrentSongListener(forceDetailsUpdate = false) {
             if (!db) return null;
 
             const currentSongDisplay = document.getElementById('current-song-display');
@@ -353,6 +369,7 @@
                         const songDoc = await getDoc(doc(db, `artifacts/${appId}/songs/${cancionActualId}`));
                         if (songDoc.exists()) {
                             const song = songDoc.data();
+                            currentSongData = { ...song, id: songDoc.id }; // Store current song data globally
                             currentSongDisplay.classList.remove('hidden');
                             currentSongDisplay.innerHTML = `
                                 <div class="bg-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 animate-fadeIn">
@@ -360,12 +377,22 @@
                                         <img src="${song.imageUrl}" onerror="this.onerror=null; this.src='https://placehold.co/300x200/cccccc/333333?text=Imagen+No+Disponible';" alt="${song.title}" class="rounded-lg shadow-md w-full h-auto object-cover">
                                     </div>
                                     <div class="md:w-2/3 text-center md:text-left">
-                                        <p class="text-sm text-gold-600 font-bold mb-1">¡Ahora Sonando!</p>
+                                        <p class="text-sm text-gold-600 font-bold mb-1">¡Ahora Sonando! 🎶</p>
                                         <h3 class="text-3xl font-extrabold text-gray-900 mb-2">${song.title}</h3>
                                         <p class="text-gray-700">${song.description}</p>
+                                        <button id="viewSongDetailsBtn" class="btn-primary mt-4 text-sm px-4 py-2">Ver Detalles de la Canción ▶️</button>
                                     </div>
                                 </div>
                             `;
+                            // Attach event listener to the new button
+                            document.getElementById('viewSongDetailsBtn')?.addEventListener('click', () => {
+                                window.location.hash = '#song-details';
+                            });
+
+                            if (window.location.hash === '#song-details' || forceDetailsUpdate) {
+                                displaySongDetails(currentSongData);
+                            }
+
                         } else {
                             currentSongDisplay.classList.add('hidden');
                             console.warn("Current song ID exists but song details not found:", cancionActualId);
@@ -382,6 +409,25 @@
                 currentSongDisplay.classList.add('hidden');
             });
         }
+
+        // Function to display song details on the #song-details page
+        function displaySongDetails(song) {
+            const songDetailsContent = document.getElementById('song-details-content');
+            if (songDetailsContent) {
+                songDetailsContent.innerHTML = `
+                    <div class="bg-white p-8 rounded-xl shadow-xl flex flex-col items-center max-w-2xl mx-auto animate-fadeIn">
+                        <img src="${song.imageUrl}" onerror="this.onerror=null; this.src='https://placehold.co/400x300/cccccc/333333?text=Imagen+No+Disponible';" alt="${song.title}" class="rounded-lg shadow-lg mb-6 w-full object-cover max-h-96">
+                        <h3 class="text-4xl font-extrabold text-gray-900 mb-3 text-center">${song.title} 🎵</h3>
+                        <p class="text-gray-700 text-lg mb-6 text-center">${song.description}</p>
+                        <button id="backToMainBtn" class="btn-primary text-lg px-6 py-3">Volver a la Página Principal ⏪🏠</button>
+                    </div>
+                `;
+                document.getElementById('backToMainBtn')?.addEventListener('click', () => {
+                    window.location.hash = ''; // Vuelve a la página principal
+                });
+            }
+        }
+
 
         // Add Comment functionality (Public Side)
         document.getElementById('submitCommentBtn')?.addEventListener('click', async () => {
@@ -418,7 +464,8 @@
                 commentMessage.classList.remove('text-red-600');
                 commentMessage.classList.add('text-green-600');
                 commentInput.value = ''; // Clear the input field
-            } catch (error) {
+            }
+            catch (error) {
                 console.error("Error submitting comment:", error);
                 commentMessage.textContent = `Error al enviar comentario: ${error.message}`;
                 commentMessage.classList.remove('text-green-600');
@@ -486,7 +533,7 @@
                 });
             }
 
-            // Lógica para votos (simple, sin persistencia en Firebase aún)
+            // Lógica para votos
             document.querySelectorAll('.vote-option-btn').forEach(button => {
                 button.addEventListener('click', (event) => {
                     // Remover 'selected' de todos los botones
@@ -917,11 +964,11 @@
     <!-- Admin Dashboard (Nuevo panel de administración de pantalla completa) -->
     <div id="admin-dashboard" class="hidden bg-gray-900 text-white min-h-screen p-6 md:p-10">
         <div class="max-w-4xl mx-auto">
-            <div class="flex justify-between items-center mb-8 pb-4 border-b border-gray-700">
-                <h2 class="text-4xl font-extrabold text-gold-400">Panel de Administración</h2>
-                <div class="flex items-center space-x-4">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-8 pb-4 border-b border-gray-700">
+                <h2 class="text-4xl font-extrabold text-gold-400 mb-4 md:mb-0">Panel de Administración ⚙️</h2>
+                <div class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
                     <p class="text-sm md:text-base">Admin: <span id="admin-email-display" class="font-semibold"></span></p>
-                    <button id="logout-button" class="btn-primary text-sm px-3 py-1 bg-red-600 hover:bg-red-700">Cerrar Sesión</button>
+                    <button id="logout-button" class="btn-primary text-sm px-3 py-1 bg-red-600 hover:bg-red-700 w-full md:w-auto">Cerrar Sesión</button>
                 </div>
             </div>
 
@@ -1211,6 +1258,14 @@
             <i class="fas fa-clipboard-list"></i>
         </button>
     </div> <!-- End of main-content -->
+
+    <!-- Song Details Page (New Section for Public View) -->
+    <div id="song-details-page" class="hidden min-h-screen bg-gray-100 p-6 md:p-10 flex flex-col justify-center items-center text-center">
+        <div id="song-details-content" class="w-full">
+            <!-- Song details will be loaded here dynamically -->
+            <p class="text-gray-600">Cargando detalles de la canción...</p>
+        </div>
+    </div>
 
 </body>
 </html>
