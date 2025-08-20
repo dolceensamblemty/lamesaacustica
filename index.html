@@ -68,39 +68,43 @@
 
         // Function to determine and render view based on URL hash and auth state
         function updateView(user) {
+            console.log("--- updateView START ---");
             console.log("updateView called. User:", user ? user.email : 'null', "Hash:", window.location.hash);
             const mainContent = document.getElementById('main-content');
             const loginFormContainer = document.getElementById('login-form-container');
             const adminDashboard = document.getElementById('admin-dashboard');
             const songDetailsPage = document.getElementById('song-details-page');
-            const nowPlayingTopBar = document.getElementById('now-playing-top-bar'); // New top bar
+            const nowPlayingTopBar = document.getElementById('now-playing-top-bar');
+            const navbar = document.querySelector('.navbar');
 
             let isAuthenticatedAsAdmin = user && user.email === 'admin@example.com';
-            console.log("isAuthenticatedAsAdmin check:", isAuthenticatedAsAdmin);
+            console.log("isAuthenticatedAsAdmin check (inside updateView):", isAuthenticatedAsAdmin);
 
-            // First, hide all main view containers and the top bar
-            mainContent.classList.add('hidden');
-            console.log("mainContent hidden:", mainContent.classList.contains('hidden'));
+            // Ensure all main view containers are hidden by default using style.display
+            mainContent.style.display = 'none';
+            loginFormContainer.style.display = 'none';
+            adminDashboard.style.display = 'none';
+            songDetailsPage.style.display = 'none';
+            nowPlayingTopBar.style.display = 'none'; // Ensure top bar is hidden initially
 
-            loginFormContainer.classList.add('hidden');
-            console.log("loginFormContainer hidden:", loginFormContainer.classList.contains('hidden'));
+            // Reset body padding and navbar position to default
+            document.body.style.paddingTop = '64px'; // Default for navbar alone
+            if (navbar) {
+                navbar.style.top = '0px';
+            }
+            if (nowPlayingTopBar) {
+                nowPlayingTopBar.classList.remove('active'); // Remove active class for transition
+            }
 
-            adminDashboard.classList.add('hidden');
-            console.log("adminDashboard hidden:", adminDashboard.classList.contains('hidden'));
 
-            songDetailsPage.classList.add('hidden');
-            console.log("songDetailsPage hidden:", songDetailsPage.classList.contains('hidden'));
-
-            nowPlayingTopBar.classList.add('hidden'); // Ensure top bar is hidden initially
-            console.log("nowPlayingTopBar hidden:", nowPlayingTopBar.classList.contains('hidden'));
-
+            console.log("All main containers explicitly hidden (display: none).");
 
             // Determine which view to show
             if (window.location.hash === '#admin') {
                 if (isAuthenticatedAsAdmin) {
                     console.log("Condition: #admin and isAuthenticatedAsAdmin is TRUE. Showing admin dashboard.");
-                    adminDashboard.classList.remove('hidden'); // Show admin panel
-                    console.log("adminDashboard hidden after removal:", adminDashboard.classList.contains('hidden'));
+                    adminDashboard.style.display = 'block'; // Use 'block' for the admin dashboard
+                    console.log("adminDashboard display after removal:", adminDashboard.style.display);
                     document.getElementById('admin-email-display').textContent = user.email;
                     if (isFirebaseInitialized) {
                         adminSongsListenerUnsubscribe = setupAdminSongsListener();
@@ -108,17 +112,16 @@
                     }
                 } else {
                     console.log("Condition: #admin but isAuthenticatedAsAdmin is FALSE. Showing login form.");
-                    loginFormContainer.classList.remove('hidden'); // Show login form
-                    console.log("loginFormContainer hidden after removal:", loginFormContainer.classList.contains('hidden'));
+                    loginFormContainer.style.display = 'flex'; // Uses flex for centering
+                    console.log("loginFormContainer display after removal:", loginFormContainer.style.display);
                     document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
                     document.getElementById('login-message').classList.remove('text-green-600');
                     document.getElementById('login-message').classList.add('text-red-600');
                 }
             } else if (window.location.hash === '#song-details') {
                 console.log("Condition: #song-details. Showing song details page.");
-                songDetailsPage.classList.remove('hidden'); // Show song details page
-                console.log("songDetailsPage hidden after removal:", songDetailsPage.classList.contains('hidden'));
-                // Only show details if currentSongData is available, otherwise try to load it
+                songDetailsPage.style.display = 'flex'; // Uses flex for centering
+                console.log("songDetailsPage display after removal:", songDetailsPage.style.display);
                 if (currentSongData) {
                     displaySongDetails(currentSongData);
                 } else {
@@ -128,15 +131,13 @@
                 }
             } else {
                 console.log("Condition: No specific hash. Showing main public content.");
-                // Default public view
-                mainContent.classList.remove('hidden'); // Show main public content
-                console.log("mainContent hidden after removal:", mainContent.classList.contains('hidden'));
-                // Set up current song listener for the new top bar
+                mainContent.style.display = 'block'; // Or 'flex' if its layout needs it
+                console.log("mainContent display after removal:", mainContent.style.display);
                 if (isFirebaseInitialized) {
                     currentSongListenerUnsubscribe = setupCurrentSongListener();
                 }
             }
-            console.log("View update completed.");
+            console.log("--- updateView END ---");
         }
 
         // Initialize Firebase
@@ -147,49 +148,77 @@
             isFirebaseInitialized = true;
             console.log("Firebase Initialized.");
 
-            onAuthStateChanged(auth, async (user) => {
-                console.log("onAuthStateChanged triggered. User:", user ? user.email : 'null', "User UID:", user ? user.uid : 'null', "Current Hash:", window.location.hash);
-                // Clear existing listeners to prevent multiple subscriptions or issues during state changes
-                if (currentSongListenerUnsubscribe) {
-                    currentSongListenerUnsubscribe();
-                    currentSongListenerUnsubscribe = null;
-                }
-                if (adminSongsListenerUnsubscribe) {
-                    adminSongsListenerUnsubscribe();
-                    adminSongsListenerUnsubscribe = null;
-                }
-                if (adminCommentsListenerUnsubscribe) {
-                    adminCommentsListenerUnsubscribe();
-                    adminCommentsListenerUnsubscribe = null;
-                }
+            // This flag ensures updateView is called only after the initial auth state is resolved.
+            // It helps prevent race conditions on initial page load.
+            let initialAuthChecked = false;
 
-                if (!user) {
-                    userId = 'anonymous';
+            onAuthStateChanged(auth, async (user) => {
+                console.log("onAuthStateChanged triggered. User:", user ? user.email : 'null', "UID:", user ? user.uid : 'null', "Hash:", window.location.hash, "InitialAuthChecked:", initialAuthChecked);
+
+                // If no user is present and it's the initial check, attempt anonymous sign-in
+                if (!user && !initialAuthChecked) {
+                    userId = 'anonymous'; // Set userId for anonymous access rules
                     try {
                         await signInAnonymously(auth);
-                        console.log("Attempted anonymous sign-in.");
+                        console.log("Attempted anonymous sign-in on initial load.");
                     } catch (error) {
                         console.error("Error during anonymous sign-in:", error);
                     }
-                } else {
+                } else if (user) {
+                    // User is authenticated (either admin or anonymous after successful sign-in)
                     userId = user.uid;
                     console.log("User is authenticated. UID:", userId);
+                } else {
+                    // This case handles a logout where user becomes null after initialAuthChecked is true
+                    userId = 'anonymous';
+                    console.log("User logged out, setting userId to anonymous.");
                 }
-                console.log("Calling updateView from onAuthStateChanged. Effective userId:", userId);
+
+                // Clear existing listeners before setting up new ones based on current view
+                if (currentSongListenerUnsubscribe) { currentSongListenerUnsubscribe(); currentSongListenerUnsubscribe = null; }
+                if (adminSongsListenerUnsubscribe) { adminSongsListenerUnsubscribe(); adminSongsListenerUnsubscribe = null; }
+                if (adminCommentsListenerUnsubscribe) { adminCommentsListenerUnsubscribe(); adminCommentsListenerUnsubscribe = null; }
+
+                initialAuthChecked = true; // Mark that initial auth state has been processed
+
+                console.log("Calling updateView from onAuthStateChanged. Effective user for updateView:", user ? user.email : 'null');
                 updateView(user);
+
+                // Adjust body padding and navbar position based on now playing bar visibility
+                const nowPlayingTopBar = document.getElementById('now-playing-top-bar');
+                const navbar = document.querySelector('.navbar');
+                if (nowPlayingTopBar && navbar) {
+                    // Temporarily remove hidden to get offsetHeight correctly
+                    nowPlayingTopBar.style.display = nowPlayingTopBar.classList.contains('hidden') ? 'none' : 'flex'; // Use flex for this bar if visible
+                    const topBarHeight = nowPlayingTopBar.offsetHeight;
+                    const navbarHeight = navbar.offsetHeight;
+
+                    if (window.getComputedStyle(nowPlayingTopBar).display !== 'none' && topBarHeight > 0) {
+                        document.body.style.paddingTop = `${topBarHeight + navbarHeight}px`;
+                        navbar.style.top = `${topBarHeight}px`;
+                        nowPlayingTopBar.classList.add('active'); // Add active class for transition
+                    } else {
+                        document.body.style.paddingTop = `${navbarHeight}px`;
+                        navbar.style.top = '0px';
+                        nowPlayingTopBar.classList.remove('active'); // Remove active class
+                    }
+                    console.log(`Adjusted body padding-top to: ${document.body.style.paddingTop}`);
+                }
             });
 
             window.addEventListener('hashchange', () => {
                 console.log("Hash changed to:", window.location.hash);
+                // When hash changes, trigger updateView with the current auth state
                 updateView(auth.currentUser);
             });
-            updateView(auth.currentUser); // Initial call
-            console.log("Initial updateView called.");
+
+            // No initial call to updateView here, onAuthStateChanged handles the very first view setup.
+            console.log("Initial Firebase setup complete. Awaiting onAuthStateChanged.");
 
         } else {
             console.error("Firebase config not found or is still placeholder. Please replace 'TU_API_KEY_AQUI' and other placeholders with your actual Firebase config.");
             document.getElementById('login-message').textContent = "Error: Firebase no configurado. Asegúrate de reemplazar los datos de configuración.";
-            document.getElementById('main-content').classList.remove('hidden'); // Fallback: show main content
+            document.getElementById('main-content').style.display = 'block'; // Fallback: show main content
         }
 
         // Admin Login
@@ -212,15 +241,9 @@
                 loginMessage.classList.add('text-green-600');
                 console.log("Admin login successful. UserCredential:", userCredential.user.email);
                 
-                // *** MODIFICACIÓN CLAVE AQUÍ: Ocultar el formulario de login explícitamente ***
-                const loginFormContainer = document.getElementById('login-form-container');
-                if (loginFormContainer) {
-                    loginFormContainer.classList.add('hidden');
-                    console.log("loginFormContainer explicitly hidden after successful login.");
-                }
-                
-                // The onAuthStateChanged listener will handle showing the admin panel after this
-                // It should be triggered automatically by Firebase after userCredential.user becomes active.
+                // DO NOT explicitly hide loginFormContainer here.
+                // Rely on onAuthStateChanged listener to handle the view update, which will call updateView.
+                // This prevents potential race conditions or flickers.
 
             } catch (error) {
                 console.error("Error al iniciar sesión:", error);
@@ -406,7 +429,7 @@
                             currentSongData = { ...song, id: songDoc.id }; // Store current song data globally
 
                             // Update the new top bar with song info
-                            nowPlayingTopBar.classList.remove('hidden');
+                            nowPlayingTopBar.style.display = 'flex'; // Use flex display
                             nowPlayingTopBar.innerHTML = `
                                 <div class="flex items-center justify-between p-2 md:px-4 bg-gold-600 text-white shadow-md rounded-b-lg w-full max-w-4xl mx-auto animate-fadeIn">
                                     <span class="text-sm md:text-base font-semibold">¡Ahora Sonando! 🎶 ${song.title}</span>
@@ -423,19 +446,39 @@
                             }
 
                         } else {
-                            nowPlayingTopBar.classList.add('hidden'); // Hide top bar if song not found
+                            nowPlayingTopBar.style.display = 'none'; // Hide top bar if song not found
                             console.warn("Current song ID exists but song details not found:", cancionActualId);
                         }
                     } else {
-                        nowPlayingTopBar.classList.add('hidden'); // Hide top bar if no current song ID
+                        nowPlayingTopBar.style.display = 'none'; // Hide top bar if no current song ID
                     }
                 } else {
-                    nowPlayingTopBar.classList.add('hidden'); // Hide top bar if 'current_song' document doesn't exist
+                    nowPlayingTopBar.style.display = 'none'; // Hide top bar if 'current_song' document doesn't exist
                     console.log("No current song state document found.");
                 }
+
+                // Adjust body padding and navbar top after nowPlayingTopBar visibility is determined
+                const navbar = document.querySelector('.navbar');
+                if (nowPlayingTopBar && navbar) {
+                    const topBarHeight = nowPlayingTopBar.offsetHeight;
+                    const navbarHeight = navbar.offsetHeight;
+
+                    if (window.getComputedStyle(nowPlayingTopBar).display !== 'none' && topBarHeight > 0) {
+                        document.body.style.paddingTop = `${topBarHeight + navbarHeight}px`;
+                        navbar.style.top = `${topBarHeight}px`;
+                        nowPlayingTopBar.classList.add('active'); // Add active class for transition
+                    } else {
+                        document.body.style.paddingTop = `${navbarHeight}px`;
+                        navbar.style.top = '0px';
+                        nowPlayingTopBar.classList.remove('active'); // Remove active class
+                    }
+                    console.log(`Adjusted body padding-top to: ${document.body.style.paddingTop}`);
+                }
+
+
             }, (error) => {
                 console.error("Error listening to current song state:", error);
-                nowPlayingTopBar.classList.add('hidden');
+                nowPlayingTopBar.style.display = 'none';
             });
         }
 
@@ -708,11 +751,11 @@
         }
         .header-content img {
             width: auto;
-            max-width: 100%; /* Ensure it doesn't overflow container */
-            height: 150px; /* Adjusted height for better spacing */
-            object-fit: contain; /* Ensure the image fits without cropping */
-            margin-bottom: 3rem; /* Increased space between logo and title */
-            display: block; /* Ensure it takes its own line for proper margin */
+            max-width: 100%;
+            height: 150px;
+            object-fit: contain;
+            margin-bottom: 3rem;
+            display: block;
         }
         .navbar {
             background-color: #2c2c2c; /* Dark charcoal */
