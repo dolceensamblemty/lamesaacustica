@@ -28,6 +28,7 @@
         // === NO USES ESTOS VALORES EN PRODUCCIÓN SIN CAMBIARLOS POR LOS TUYOS REALES ===
         // =====================================================================================
         const firebaseConfig = {
+              // Asegúrate de que estos valores sean los de TU proyecto de Firebase
               apiKey: "AIzaSyDiToXPpDhmu5b3RZI43BKJwgixue9tbzs",
               authDomain: "la-mesa-acustica-app.firebaseapp.com",
               projectId: "la-mesa-acustica-app",
@@ -61,11 +62,20 @@
                 adminSongsListenerUnsubscribe = null;
             }
 
+            // Always show main content by default unless explicitly showing login form
+            // Ensure main content is visible by default
+            mainContent.classList.remove('hidden');
+            // Hide login form and admin panel by default
+            loginFormContainer.classList.add('hidden');
+            adminPanel.classList.add('hidden');
+
+
             if (window.location.hash === '#admin') {
                 if (isAuthenticatedAsAdmin) {
-                    loginFormContainer.classList.add('hidden');
+                    // Admin is logged in and on admin hash
                     adminPanel.classList.remove('hidden');
-                    mainContent.classList.remove('hidden'); // Show main content (including admin panel at bottom)
+                    // Ensure main content remains visible when admin panel is shown
+                    mainContent.classList.remove('hidden');
                     adminEmailDisplay.textContent = user.email;
                     if (isFirebaseInitialized) {
                         adminSongsListenerUnsubscribe = setupAdminSongsListener(); // Setup admin listener
@@ -73,17 +83,14 @@
                 } else {
                     // On #admin page but not authenticated as admin (or not authenticated at all)
                     loginFormContainer.classList.remove('hidden'); // Show login form
-                    adminPanel.classList.add('hidden');
-                    mainContent.classList.add('hidden'); // Hide main content
+                    mainContent.classList.add('hidden'); // Hide main content while login is active
                     document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
                     document.getElementById('login-message').classList.remove('text-green-600');
                     document.getElementById('login-message').classList.add('text-red-600');
                 }
             } else {
-                // Public view
-                loginFormContainer.classList.add('hidden');
-                adminPanel.classList.add('hidden');
-                mainContent.classList.remove('hidden');
+                // Public view (no #admin hash)
+                // Main content is already set to visible by default above.
                 if (isFirebaseInitialized) {
                     currentSongListenerUnsubscribe = setupCurrentSongListener(); // Setup public listener
                 }
@@ -92,8 +99,8 @@
         }
 
         // Initialize Firebase
-        // Solo inicializamos si la configuración no está vacía.
-        if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey !== "TU_API_KEY_AQUI") { // Added check for placeholder
+        // Solo inicializamos si la configuración no está vacía y no tiene los placeholders.
+        if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey !== "TU_API_KEY_AQUI") {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
@@ -133,16 +140,15 @@
 
             // Initial view setup when Firebase is ready (important for first load)
             // This will be re-evaluated by onAuthStateChanged but helps ensure initial state
-            updateView(auth.currentUser);
+            updateView(auth.currentUser); // This call ensures initial display based on current hash and auth state
 
         } else {
             console.error("Firebase config not found or is still placeholder. Please replace 'TU_API_KEY_AQUI' and other placeholders with your actual Firebase config.");
             document.getElementById('login-message').textContent = "Error: Firebase no configurado. Asegúrate de reemplazar los datos de configuración.";
-             // Ensure main content is visible even if Firebase init fails for some reason,
-             // so the user doesn't just see a blank page.
-             document.getElementById('main-content').classList.remove('hidden');
-             document.getElementById('login-form-container').classList.add('hidden');
-             document.getElementById('admin-panel').classList.add('hidden');
+            // If Firebase init fails, ensure main content is still visible to avoid a blank page.
+            document.getElementById('main-content').classList.remove('hidden');
+            document.getElementById('login-form-container').classList.add('hidden');
+            document.getElementById('admin-panel').classList.add('hidden');
         }
 
         // Admin Login
@@ -720,8 +726,8 @@
         </div>
     </div>
 
-    <!-- Main Content (Hidden initially, shown based on hash or after admin login) -->
-    <div id="main-content" class="hidden">
+    <!-- Main Content (Removed 'hidden' class from here) -->
+    <div id="main-content">
         <!-- Navbar -->
         <nav class="navbar flex items-center relative z-50 justify-between md:justify-center">
             <button id="hamburger" class="text-white text-2xl focus:outline-none md:hidden">
@@ -780,8 +786,8 @@
                 <p id="commentMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Comentario enviado! Gracias por compartir. ✨</p>
                 <div class="mt-6 flex justify-center space-x-4">
                     <button class="social-share-btn" onclick="shareOnSocial('facebook')"><i class="fab fa-facebook-f"></i></button>
-                    <button class="social-share-btn" onclick="shareOnSocial('twitter')"><i class="fab fa-twitter"></i></button>
-                    <button class="social-share-btn" onclick="shareOnSocial('instagram')"><i class="fab fa-instagram"></i></button>
+                    <button class="social-share-btn" onclick="shareOnSocial('twitter')"><i class="fab fa-twitter"></i></i
+>                    <button class="social-share-btn" onclick="shareOnSocial('instagram')"><i class="fab fa-instagram"></i></button>
                 </div>
             </div>
         </section>
