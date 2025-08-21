@@ -14,19 +14,16 @@
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, onSnapshot, collection, query, orderBy, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global Firebase instances
+        // Instancias globales de Firebase
         let app;
         let db;
         let auth;
         let userId;
         let isFirebaseInitialized = false;
         let currentSongListenerUnsubscribe = null;
-        let adminSongsListenerUnsubscribe = null;
-        let adminCommentsListenerUnsubscribe = null;
         let currentSongData = null; // Variable para almacenar la información de la canción actual
 
-        // Firebase configuration (REEMPLAZA ESTO CON TUS VALORES REALES DE FIREBASE)
-        // Asegúrate de que estos valores sean los de TU proyecto de Firebase
+        // Configuración de Firebase (REEMPLAZA ESTO CON TUS VALORES REALES DE FIREBASE)
         const firebaseConfig = {
             apiKey: "AIzaSyDiToXPpDhmu5b3RZI43BKJwgixue9tbzs",
             authDomain: "la-mesa-acustica-app.firebaseapp.com",
@@ -54,7 +51,7 @@
         window.openModal = openModal;
         window.closeModal = closeModal;
 
-        // Placeholder functions for social sharing (to prevent errors)
+        // Funciones de marcador de posición para compartir en redes sociales (para evitar errores)
         function shareOnSocial(platform) {
             console.log(`Intentando compartir en ${platform}. Esta funcionalidad requiere integración real.`);
         }
@@ -65,75 +62,41 @@
         window.shareOnSocial = shareOnSocial;
         window.shareMusician = shareMusician;
 
+        // Función para abrir el video del músico
+        function openMusicianVideo(videoUrl) {
+            window.open(videoUrl, '_blank');
+        }
+        window.openMusicianVideo = openMusicianVideo; // Hacerla accesible globalmente
 
-        // Function to determine and render view based on URL hash and auth state
+        // Función para determinar y renderizar la vista basada en el hash de la URL
         function updateView(user) {
             console.log("--- updateView START ---");
-            console.log("updateView called. User:", user ? user.email : 'null', "Hash:", window.location.hash);
+            console.log("updateView llamada. Usuario:", user ? user.email : 'null', "Hash:", window.location.hash);
             const mainContent = document.getElementById('main-content');
-            const loginFormContainer = document.getElementById('login-form-container');
-            const adminDashboard = document.getElementById('admin-dashboard');
             const songDetailsPage = document.getElementById('song-details-page');
-            const nowPlayingTopBar = document.getElementById('now-playing-top-bar');
-            const navbar = document.querySelector('.navbar');
 
-            // *** MODIFICACIÓN AQUÍ: CAMBIAR 'admin@example.com' al correo electrónico real del administrador ***
-            let isAuthenticatedAsAdmin = user && user.email === 'dolceensamblenty@gmail.com';
-            console.log("isAuthenticatedAsAdmin check (inside updateView):", isAuthenticatedAsAdmin);
-
-            // Ensure all main view containers are hidden by default using style.display
+            // Asegura que todos los contenedores de vista principales estén ocultos por defecto
             mainContent.style.display = 'none';
-            loginFormContainer.style.display = 'none';
-            adminDashboard.style.display = 'none';
             songDetailsPage.style.display = 'none';
-            nowPlayingTopBar.style.display = 'none'; // Ensure top bar is hidden initially
 
-            // Reset body padding and navbar position to default
-            document.body.style.paddingTop = '64px'; // Default for navbar alone
-            if (navbar) {
-                navbar.style.top = '0px';
-            }
-            if (nowPlayingTopBar) {
-                nowPlayingTopBar.classList.remove('active'); // Remove active class for transition
-            }
+            console.log("Todos los contenedores principales ocultos explícitamente (display: none).");
 
-
-            console.log("All main containers explicitly hidden (display: none).");
-
-            // Determine which view to show
-            if (window.location.hash === '#admin') {
-                if (isAuthenticatedAsAdmin) {
-                    console.log("Condition: #admin and isAuthenticatedAsAdmin is TRUE. Showing admin dashboard.");
-                    adminDashboard.style.display = 'block'; // Use 'block' for the admin dashboard
-                    console.log("adminDashboard display after removal:", adminDashboard.style.display);
-                    document.getElementById('admin-email-display').textContent = user.email;
-                    if (isFirebaseInitialized) {
-                        adminSongsListenerUnsubscribe = setupAdminSongsListener();
-                        adminCommentsListenerUnsubscribe = setupAdminCommentsListener();
-                    }
-                } else {
-                    console.log("Condition: #admin but isAuthenticatedAsAdmin is FALSE. Showing login form.");
-                    loginFormContainer.style.display = 'flex'; // Uses flex for centering
-                    console.log("loginFormContainer display after removal:", loginFormContainer.style.display);
-                    document.getElementById('login-message').textContent = 'Acceso denegado. Solo administradores.';
-                    document.getElementById('login-message').classList.remove('text-green-600');
-                    document.getElementById('login-message').classList.add('text-red-600');
-                }
-            } else if (window.location.hash === '#song-details') {
-                console.log("Condition: #song-details. Showing song details page.");
-                songDetailsPage.style.display = 'flex'; // Uses flex for centering
-                console.log("songDetailsPage display after removal:", songDetailsPage.style.display);
+            // Determina qué vista mostrar
+            if (window.location.hash === '#song-details') {
+                console.log("Condición: #song-details. Mostrando la página de detalles de la canción.");
+                songDetailsPage.style.display = 'flex'; // Usa flex para centrado
+                console.log("songDetailsPage display después de la actualización:", songDetailsPage.style.display);
                 if (currentSongData) {
                     displaySongDetails(currentSongData);
                 } else {
                     if (isFirebaseInitialized) {
-                        setupCurrentSongListener(true); // Force update to load details
+                        setupCurrentSongListener(true); // Fuerza la actualización para cargar detalles
                     }
                 }
             } else {
-                console.log("Condition: No specific hash. Showing main public content.");
-                mainContent.style.display = 'block'; // Or 'flex' if its layout needs it
-                console.log("mainContent display after removal:", mainContent.style.display);
+                console.log("Condición: Sin hash específico. Mostrando el contenido público principal.");
+                mainContent.style.display = 'block';
+                console.log("mainContent display después de la actualización:", mainContent.style.display);
                 if (isFirebaseInitialized) {
                     currentSongListenerUnsubscribe = setupCurrentSongListener();
                 }
@@ -141,282 +104,80 @@
             console.log("--- updateView END ---");
         }
 
-        // Initialize Firebase
+        // Inicializar Firebase
         if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey !== "TU_API_KEY_AQUI") {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
             isFirebaseInitialized = true;
-            console.log("Firebase Initialized.");
+            console.log("Firebase Inicializado.");
 
-            // This flag ensures updateView is called only after the initial auth state is resolved.
-            // It helps prevent race conditions on initial page load.
+            // Esta bandera asegura que updateView se llame solo después de que se resuelva el estado de autenticación inicial.
+            // Ayuda a prevenir condiciones de carrera en la carga inicial de la página.
             let initialAuthChecked = false;
 
             onAuthStateChanged(auth, async (user) => {
-                console.log("onAuthStateChanged triggered. User:", user ? user.email : 'null', "UID:", user ? user.uid : 'null', "Hash:", window.location.hash, "InitialAuthChecked:", initialAuthChecked);
+                console.log("onAuthStateChanged activado. Usuario:", user ? user.email : 'null', "UID:", user ? user.uid : 'null', "Hash:", window.location.hash, "InitialAuthChecked:", initialAuthChecked);
 
-                // If no user is present and it's the initial check, attempt anonymous sign-in
+                // Si no hay usuario presente y es la comprobación inicial, intenta el inicio de sesión anónimo
                 if (!user && !initialAuthChecked) {
-                    userId = 'anonymous'; // Set userId for anonymous access rules
+                    userId = 'anonymous'; // Establece userId para reglas de acceso anónimo
                     try {
                         await signInAnonymously(auth);
-                        console.log("Attempted anonymous sign-in on initial load.");
+                        console.log("Intento de inicio de sesión anónimo en la carga inicial.");
                     } catch (error) {
-                        console.error("Error during anonymous sign-in:", error);
+                        console.error("Error durante el inicio de sesión anónimo:", error);
                     }
                 } else if (user) {
-                    // User is authenticated (either admin or anonymous after successful sign-in)
+                    // El usuario está autenticado (ya sea admin o anónimo después de un inicio de sesión exitoso)
                     userId = user.uid;
-                    console.log("User is authenticated. UID:", userId);
+                    console.log("El usuario está autenticado. UID:", userId);
                 } else {
-                    // This case handles a logout where user becomes null after initialAuthChecked is true
+                    // Este caso maneja un cierre de sesión donde el usuario se vuelve nulo después de que initialAuthChecked es true
                     userId = 'anonymous';
-                    console.log("User logged out, setting userId to anonymous.");
+                    console.log("El usuario cerró sesión, configurando userId como anónimo.");
                 }
 
-                // Clear existing listeners before setting up new ones based on current view
+                // Limpiar listeners existentes antes de configurar nuevos basados en la vista actual
                 if (currentSongListenerUnsubscribe) { currentSongListenerUnsubscribe(); currentSongListenerUnsubscribe = null; }
-                if (adminSongsListenerUnsubscribe) { adminSongsListenerUnsubscribe(); adminSongsListenerUnsubscribe = null; }
-                if (adminCommentsListenerUnsubscribe) { adminCommentsListenerUnsubscribe(); adminCommentsListenerUnsubscribe = null; }
 
-                initialAuthChecked = true; // Mark that initial auth state has been processed
+                initialAuthChecked = true; // Marca que el estado de autenticación inicial ha sido procesado
 
-                console.log("Calling updateView from onAuthStateChanged. Effective user for updateView:", user ? user.email : 'null');
+                console.log("Llamando a updateView desde onAuthStateChanged. Usuario efectivo para updateView:", user ? user.email : 'null');
                 updateView(user);
 
-                // Adjust body padding and navbar position based on now playing bar visibility
-                const nowPlayingTopBar = document.getElementById('now-playing-top-bar');
-                const navbar = document.querySelector('.navbar');
-                if (nowPlayingTopBar && navbar) {
-                    // Temporarily remove hidden to get offsetHeight correctly
-                    nowPlayingTopBar.style.display = nowPlayingTopBar.classList.contains('hidden') ? 'none' : 'flex'; // Use flex for this bar if visible
-                    const topBarHeight = nowPlayingTopBar.offsetHeight;
-                    const navbarHeight = navbar.offsetHeight;
-
-                    if (window.getComputedStyle(nowPlayingTopBar).display !== 'none' && topBarHeight > 0) {
-                        document.body.style.paddingTop = `${topBarHeight + navbarHeight}px`;
-                        navbar.style.top = `${topBarHeight}px`;
-                        nowPlayingTopBar.classList.add('active'); // Add active class for transition
-                    } else {
-                        document.body.style.paddingTop = `${navbarHeight}px`;
-                        navbar.style.top = '0px';
-                        nowPlayingTopBar.classList.remove('active'); // Remove active class
-                    }
-                    console.log(`Adjusted body padding-top to: ${document.body.style.paddingTop}`);
-                }
+                console.log(`Padding-top del body y posición del navbar son controlados por CSS.`);
             });
 
             window.addEventListener('hashchange', () => {
-                console.log("Hash changed to:", window.location.hash);
-                // When hash changes, trigger updateView with the current auth state
+                console.log("Hash cambiado a:", window.location.hash);
+                // Cuando el hash cambia, activa updateView con el estado de autenticación actual
                 updateView(auth.currentUser);
             });
 
-            // No initial call to updateView here, onAuthStateChanged handles the very first view setup.
-            console.log("Initial Firebase setup complete. Awaiting onAuthStateChanged.");
+            // No hay llamada inicial a updateView aquí, onAuthStateChanged maneja la configuración de la primera vista.
+            console.log("Configuración inicial de Firebase completa. Esperando onAuthStateChanged.");
 
         } else {
-            console.error("Firebase config not found or is still placeholder. Please replace 'TU_API_KEY_AQUI' and other placeholders with your actual Firebase config.");
-            document.getElementById('login-message').textContent = "Error: Firebase no configurado. Asegúrate de reemplazar los datos de configuración.";
-            document.getElementById('main-content').style.display = 'block'; // Fallback: show main content
+            console.error("No se encontró la configuración de Firebase o aún es un marcador de posición. Asegúrate de reemplazar 'TU_API_KEY_AQUI' y otros marcadores de posición con tu configuración real de Firebase.");
+            document.getElementById('main-content').style.display = 'block'; // Fallback: mostrar contenido principal
         }
 
-        // Admin Login
-        document.getElementById('login-form')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('admin-email').value;
-            const password = document.getElementById('admin-password').value;
-            const loginMessage = document.getElementById('login-message');
-
-            if (!auth) {
-                loginMessage.textContent = 'Error: Firebase Auth no inicializado.';
-                loginMessage.classList.add('text-red-600');
-                return;
-            }
-            console.log("Attempting admin login with email:", email);
-            try {
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                loginMessage.textContent = 'Inicio de sesión exitoso.';
-                loginMessage.classList.remove('text-red-600');
-                loginMessage.classList.add('text-green-600');
-                console.log("Admin login successful. UserCredential:", userCredential.user.email);
-                
-                // DO NOT explicitly hide loginFormContainer here.
-                // Rely on onAuthStateChanged listener to handle the view update, which will call updateView.
-                // This prevents potential race conditions or flickers.
-
-            } catch (error) {
-                console.error("Error al iniciar sesión:", error);
-                loginMessage.textContent = `Error: ${error.message}`;
-                loginMessage.classList.remove('text-green-600');
-                loginMessage.classList.add('text-red-600');
-            }
-        });
-
-        // Admin Logout
-        document.getElementById('logout-button')?.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                console.log("Sesión cerrada correctamente.");
-                window.location.hash = ''; // Redirigir a la vista pública
-                // updateView will be called by onAuthStateChanged after logout
-                document.getElementById('login-message').textContent = '';
-            } catch (error) {
-                console.error("Error al cerrar sesión:", error);
-            }
-        });
-
-        // Add Song to Firestore (Admin Functionality)
-        document.getElementById('add-song-form')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const titleInput = document.getElementById('song-title');
-            const descriptionInput = document.getElementById('song-description');
-            const imageUrlInput = document.getElementById('song-image-url');
-            const songIdToEditInput = document.getElementById('song-id-to-edit');
-            const addSongMessage = document.getElementById('add-song-message');
-
-            const title = titleInput.value;
-            const description = descriptionInput.value;
-            const imageUrl = imageUrlInput.value;
-            const songIdToEdit = songIdToEditInput.value;
-
-            if (!db) {
-                addSongMessage.textContent = 'Error: Firebase Firestore no inicializado.';
-                addSongMessage.classList.add('text-red-600');
-                return;
-            }
-
-            try {
-                if (songIdToEdit) {
-                    // Edit existing song
-                    await setDoc(doc(db, `artifacts/${appId}/songs/${songIdToEdit}`), {
-                        title: title,
-                        description: description,
-                        imageUrl: imageUrl,
-                        lastUpdated: new Date()
-                    }, { merge: true }); // Use merge to only update provided fields
-                    addSongMessage.textContent = 'Canción actualizada con éxito!';
-                } else {
-                    // Add new song
-                    await addDoc(collection(db, `artifacts/${appId}/songs`), {
-                        title: title,
-                        description: description,
-                        imageUrl: imageUrl,
-                        createdAt: new Date()
-                    });
-                    addSongMessage.textContent = 'Canción añadida con éxito!';
-                }
-                addSongMessage.classList.remove('text-red-600');
-                addSongMessage.classList.add('text-green-600');
-                e.target.reset(); // Clear form
-                songIdToEditInput.value = ''; // Clear edit ID
-                document.getElementById('add-song-button').textContent = 'Añadir'; // Reset button text
-            } catch (error) {
-                console.error("Error adding/editing song:", error);
-                addSongMessage.textContent = `Error: ${error.message}`;
-                addSongMessage.classList.remove('text-green-600');
-                addSongMessage.classList.add('text-red-600');
-            }
-            setTimeout(() => addSongMessage.classList.add('hidden'), 3000);
-            addSongMessage.classList.remove('hidden');
-        });
-
-        // Delete Song from Firestore (Admin Functionality)
-        async function deleteSong(songId) {
-            if (!db) return;
-            // Usar una confirmación de modal UI en lugar de alert/confirm
-            // Por simplicidad, aquí se asume la confirmación, pero idealmente sería un modal personalizado.
-            if (confirm("¿Estás seguro de que quieres eliminar esta canción?")) { // Usando confirm para la demo
-                try {
-                    await deleteDoc(doc(db, `artifacts/${appId}/songs/${songId}`));
-                    console.log(`Canción eliminada: ${songId}`);
-                } catch (error) {
-                    console.error("Error deleting song:", error);
-                }
-            }
+        // Función para manejar el clic del botón "Ver Detalles"
+        function handleViewSongDetailsClick() {
+            window.location.hash = '#song-details';
         }
 
-        // Setup Admin Songs Listener (Real-time updates)
-        function setupAdminSongsListener() {
-            if (!db || !auth.currentUser || auth.currentUser.email !== 'dolceensamblenty@gmail.com') { // Updated admin email check
-                const songsListContainer = document.getElementById('admin-songs-list');
-                if (songsListContainer) songsListContainer.innerHTML = '<p class="text-center text-gray-400">Acceso no autorizado para ver canciones.</p>';
-                return null;
-            }
-
-            const songsListContainer = document.getElementById('admin-songs-list');
-            if (!songsListContainer) return null;
-
-            return onSnapshot(collection(db, `artifacts/${appId}/songs`), (snapshot) => {
-                songsListContainer.innerHTML = '';
-                if (snapshot.empty) {
-                    songsListContainer.innerHTML = '<p class="text-center text-gray-400">No hay canciones añadidas. Usa el formulario de arriba.</p>';
-                }
-                snapshot.forEach((doc) => {
-                    const song = doc.data();
-                    const songId = doc.id;
-                    const songItem = document.createElement('div');
-                    songItem.className = 'flex flex-col md:flex-row items-center justify-between p-3 bg-gray-50 rounded-md shadow-sm mb-2';
-                    songItem.innerHTML = `
-                        <div class="flex-1 text-center md:text-left mb-2 md:mb-0">
-                            <h4 class="font-semibold text-gray-800">${song.title}</h4>
-                            <p class="text-sm text-gray-600">${song.description}</p>
-                        </div>
-                        <div class="flex flex-wrap justify-center md:justify-end gap-2">
-                            <button data-song-id="${songId}" data-song-title="${song.title}" data-song-description="${song.description}" data-song-imageurl="${song.imageUrl}" class="edit-song-btn btn-primary bg-blue-500 hover:bg-blue-600 text-sm px-3 py-1">Editar</button>
-                            <button data-song-id="${songId}" class="set-current-song-btn btn-primary ml-0 md:ml-2 text-sm px-3 py-1">Activar</button>
-                            <button data-song-id="${songId}" class="delete-song-btn btn-primary bg-red-500 hover:bg-red-600 text-sm px-3 py-1">Eliminar</button>
-                        </div>
-                    `;
-                    songsListContainer.appendChild(songItem);
-                });
-
-                document.querySelectorAll('.set-current-song-btn').forEach(button => {
-                    button.onclick = async (event) => {
-                        const songId = event.target.dataset.songId;
-                        if (!db) return;
-                        try {
-                            await setDoc(doc(db, `artifacts/${appId}/app_state/current_song`), {
-                                cancionActualId: songId,
-                                lastUpdated: new Date()
-                            });
-                            console.log(`Canción actual establecida a: ${songId}`);
-                        } catch (error) {
-                            console.error("Error setting current song:", error);
-                        }
-                    };
-                });
-
-                document.querySelectorAll('.edit-song-btn').forEach(button => {
-                    button.onclick = (event) => {
-                        document.getElementById('song-title').value = event.target.dataset.songTitle;
-                        document.getElementById('song-description').value = event.target.dataset.songDescription;
-                        document.getElementById('song-image-url').value = event.target.dataset.songImageurl;
-                        document.getElementById('song-id-to-edit').value = event.target.dataset.songId;
-                        document.getElementById('add-song-button').textContent = 'Guardar Cambios'; // Change button text
-                        document.getElementById('add-song-message').classList.add('hidden'); // Clear message
-                        window.scrollTo(0, 0); // Scroll to top to see the form
-                    };
-                });
-
-                document.querySelectorAll('.delete-song-btn').forEach(button => {
-                    button.onclick = (event) => {
-                        deleteSong(event.target.dataset.songId);
-                    };
-                });
-
-            }, (error) => {
-                console.error("Error listening to admin songs:", error);
-                songsListContainer.innerHTML = `<p class="text-center text-red-400">Error al cargar canciones: ${error.message}</p>`;
-            });
-        }
-
-        // Setup Current Song Listener for Users (Real-time updates)
+        // Setup Current Song Listener para Usuarios (actualizaciones en tiempo real)
         function setupCurrentSongListener() {
             if (!db) return null;
 
-            const nowPlayingTopBar = document.getElementById('now-playing-top-bar'); // Get the new top bar element
+            // Obtener los elementos de la nueva sección "Ahora Sonando"
+            const nowPlayingSection = document.getElementById('now-playing-section');
+            const currentSongInfoDiv = document.getElementById('current-song-info');
+            const viewSongDetailsBtn = document.getElementById('viewSongDetailsBtn');
+
+            if (!nowPlayingSection || !currentSongInfoDiv || !viewSongDetailsBtn) return null; // Fallback si los elementos no existen
 
             return onSnapshot(doc(db, `artifacts/${appId}/app_state/current_song`), async (docSnapshot) => {
                 if (docSnapshot.exists()) {
@@ -427,63 +188,54 @@
                         const songDoc = await getDoc(doc(db, `artifacts/${appId}/songs/${cancionActualId}`));
                         if (songDoc.exists()) {
                             const song = songDoc.data();
-                            currentSongData = { ...song, id: songDoc.id }; // Store current song data globally
+                            currentSongData = { ...song, id: songDoc.id }; // Almacena los datos de la canción actual globalmente
 
-                            // Update the new top bar with song info
-                            nowPlayingTopBar.style.display = 'flex'; // Use flex display
-                            nowPlayingTopBar.innerHTML = `
-                                <div class="flex items-center justify-between p-2 md:px-4 bg-gold-600 text-white shadow-md rounded-b-lg w-full max-w-4xl mx-auto animate-fadeIn">
-                                    <span class="text-sm md:text-base font-semibold">¡Ahora Sonando! 🎶 ${song.title}</span>
-                                    <button id="viewSongDetailsBtn" class="bg-white text-gold-600 px-3 py-1 rounded-full text-xs md:text-sm font-bold hover:bg-gray-100 transition duration-300">Ver Detalles ▶️</button>
-                                </div>
+                            // Actualiza el contenido de la sección "Ahora Sonando"
+                            currentSongInfoDiv.innerHTML = `
+                                <p class="text-xl md:text-2xl font-bold text-gold-600 mb-2">${song.title}</p>
+                                <p class="text-gray-700">${song.description}</p>
                             `;
-                            document.getElementById('viewSongDetailsBtn')?.addEventListener('click', () => {
-                                window.location.hash = '#song-details';
-                            });
+                            viewSongDetailsBtn.classList.remove('hidden'); // Muestra el botón
 
-                            // If currently on the song details page, update its content
+                            // Asegúrate de que el evento solo se añade una vez
+                            // Remueve el listener previo si existe para evitar duplicados
+                            viewSongDetailsBtn.removeEventListener('click', handleViewSongDetailsClick);
+                            viewSongDetailsBtn.addEventListener('click', handleViewSongDetailsClick);
+
+                            // Si actualmente está en la página de detalles de la canción, actualiza su contenido
                             if (window.location.hash === '#song-details') {
                                 displaySongDetails(currentSongData);
                             }
 
                         } else {
-                            nowPlayingTopBar.style.display = 'none'; // Hide top bar if song not found
-                            console.warn("Current song ID exists but song details not found:", cancionActualId);
+                            // Si la canción no se encuentra, muestra un mensaje y oculta el botón
+                            currentSongInfoDiv.innerHTML = '<p class="text-gray-600">No se encontraron detalles para la canción actual.</p>';
+                            viewSongDetailsBtn.classList.add('hidden');
+                            currentSongData = null; // Borrar si la canción no se encuentra
+                            console.warn("La ID de la canción actual existe pero no se encontraron los detalles de la canción:", cancionActualId);
                         }
                     } else {
-                        nowPlayingTopBar.style.display = 'none'; // Hide top bar if no current song ID
+                        // Si no hay ID de canción actual, muestra un mensaje y oculta el botón
+                        currentSongInfoDiv.innerHTML = '<p class="text-gray-600">No hay una canción sonando en este momento.</p>';
+                        viewSongDetailsBtn.classList.add('hidden');
+                        currentSongData = null; // Borrar si no hay ID de canción actual
                     }
                 } else {
-                    nowPlayingTopBar.style.display = 'none'; // Hide top bar if 'current_song' document doesn't exist
-                    console.log("No current song state document found.");
+                    // Si el documento 'current_song' no existe, muestra un mensaje y oculta el botón
+                    currentSongInfoDiv.innerHTML = '<p class="text-gray-600">No hay una canción sonando en este momento.</p>';
+                    viewSongDetailsBtn.classList.add('hidden');
+                    currentSongData = null; // Borrar si el documento 'current_song' no existe
+                    console.log("No se encontró el documento de estado de la canción actual.");
                 }
-
-                // Adjust body padding and navbar top after nowPlayingTopBar visibility is determined
-                const navbar = document.querySelector('.navbar');
-                if (nowPlayingTopBar && navbar) {
-                    const topBarHeight = nowPlayingTopBar.offsetHeight;
-                    const navbarHeight = navbar.offsetHeight;
-
-                    if (window.getComputedStyle(nowPlayingTopBar).display !== 'none' && topBarHeight > 0) {
-                        document.body.style.paddingTop = `${topBarHeight + navbarHeight}px`;
-                        navbar.style.top = `${topBarHeight}px`;
-                        nowPlayingTopBar.classList.add('active'); // Add active class for transition
-                    } else {
-                        document.body.style.paddingTop = `${navbarHeight}px`;
-                        navbar.style.top = '0px';
-                        nowPlayingTopBar.classList.remove('active'); // Remove active class
-                    }
-                    console.log(`Adjusted body padding-top to: ${document.body.style.paddingTop}`);
-                }
-
-
             }, (error) => {
-                console.error("Error listening to current song state:", error);
-                nowPlayingTopBar.style.display = 'none';
+                console.error("Error al escuchar el estado de la canción actual:", error);
+                currentSongInfoDiv.innerHTML = '<p class="text-red-600">Error al cargar la información de la canción.</p>';
+                viewSongDetailsBtn.classList.add('hidden');
+                currentSongData = null; // Borrar en caso de error
             });
         }
 
-        // Function to display song details on the #song-details page
+        // Función para mostrar los detalles de la canción en la página #song-details
         function displaySongDetails(song) {
             const songDetailsContent = document.getElementById('song-details-content');
             if (songDetailsContent) {
@@ -502,7 +254,9 @@
         }
 
 
-        // Add Comment functionality (Public Side)
+        // Funcionalidad de Añadir Comentario (lado público)
+        // NOTA: Esta funcionalidad se mantuvo, pero la sección de UI asociada se eliminó.
+        // Si ya no se necesita la lógica de guardar comentarios anónimos, esta función podría eliminarse.
         document.getElementById('submitCommentBtn')?.addEventListener('click', async () => {
             const commentInput = document.getElementById('commentInput');
             const commentMessage = document.getElementById('commentMessage');
@@ -530,16 +284,16 @@
                 await addDoc(collection(db, `artifacts/${appId}/anonymous_comments`), {
                     comment: commentText,
                     timestamp: new Date(),
-                    // Optionally, you could add an anonymous user ID for basic tracking
+                    // Opcionalmente, podrías añadir una ID de usuario anónimo para seguimiento básico
                     // userId: auth.currentUser?.uid || 'anonymous'
                 });
                 commentMessage.textContent = '¡Comentario enviado! Gracias por compartir. ✨';
                 commentMessage.classList.remove('text-red-600');
                 commentMessage.classList.add('text-green-600');
-                commentInput.value = ''; // Clear the input field
+                commentInput.value = ''; // Limpiar el campo de entrada
             }
             catch (error) {
-                console.error("Error submitting comment:", error);
+                console.error("Error al enviar el comentario:", error);
                 commentMessage.textContent = `Error al enviar comentario: ${error.message}`;
                 commentMessage.classList.remove('text-green-600');
                 commentMessage.classList.add('text-red-600');
@@ -547,39 +301,6 @@
             commentMessage.classList.remove('hidden');
             setTimeout(() => commentMessage.classList.add('hidden'), 3000);
         });
-
-        // Setup Admin Comments Listener
-        function setupAdminCommentsListener() {
-            if (!db || !auth.currentUser || auth.currentUser.email !== 'dolceensamblenty@gmail.com') { // Updated admin email check
-                const commentsListContainer = document.getElementById('admin-comments-list');
-                if (commentsListContainer) commentsListContainer.innerHTML = '<p class="text-center text-gray-400">Acceso no autorizado para ver comentarios.</p>';
-                return null;
-            }
-
-            const commentsListContainer = document.getElementById('admin-comments-list');
-            if (!commentsListContainer) return null;
-
-            return onSnapshot(collection(db, `artifacts/${appId}/anonymous_comments`), (snapshot) => {
-                commentsListContainer.innerHTML = '';
-                if (snapshot.empty) {
-                    commentsListContainer.innerHTML = '<p class="text-center text-gray-400">No hay comentarios aún.</p>';
-                }
-                snapshot.forEach((doc) => {
-                    const commentData = doc.data();
-                    const commentItem = document.createElement('div');
-                    commentItem.className = 'bg-gray-50 p-3 rounded-md shadow-sm mb-2';
-                    commentItem.innerHTML = `
-                        <p class="text-gray-800">${commentData.comment}</p>
-                        <p class="text-xs text-gray-500 mt-1">Enviado: ${new Date(commentData.timestamp.toDate()).toLocaleString()}</p>
-                    `;
-                    commentsListContainer.appendChild(commentItem);
-                });
-            }, (error) => {
-                console.error("Error listening to comments:", error);
-                commentsListContainer.innerHTML = `<p class="text-center text-red-400">Error al cargar comentarios: ${error.message}</p>`;
-            });
-        }
-
 
         // Se ejecuta cuando el DOM está completamente cargado
         document.addEventListener('DOMContentLoaded', () => {
@@ -606,22 +327,6 @@
                 });
             }
 
-            // Password toggle for admin login
-            const passwordInput = document.getElementById('admin-password');
-            const togglePassword = document.getElementById('toggle-password');
-            if (passwordInput && togglePassword) {
-                togglePassword.addEventListener('click', function () {
-                    // toggle the type attribute
-                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                    passwordInput.setAttribute('type', type);
-
-                    // toggle the eye icon
-                    this.classList.toggle('fa-eye');
-                    this.classList.toggle('fa-eye-slash');
-                });
-            }
-
-
             // Lógica para votos
             document.querySelectorAll('.vote-option-btn').forEach(button => {
                 button.addEventListener('click', (event) => {
@@ -641,7 +346,7 @@
                     voteMessage.classList.remove('text-green-600');
                     voteMessage.classList.add('text-red-600');
                     voteMessage.classList.remove('hidden');
-                    setTimeout(() => voteMessage.classList.add('hidden'), 3000);
+                    setTimeout(() => commentMessage.classList.add('hidden'), 3000);
                     return;
                 }
 
@@ -652,7 +357,7 @@
                     voteMessage.classList.remove('text-green-600');
                     voteMessage.classList.add('text-red-600');
                     voteMessage.classList.remove('hidden');
-                    setTimeout(() => voteMessage.classList.add('hidden'), 3000);
+                    setTimeout(() => commentMessage.classList.add('hidden'), 3000);
                     return;
                 }
 
@@ -666,7 +371,7 @@
                     voteMessage.classList.remove('text-red-600');
                     voteMessage.classList.add('text-green-600');
                 } catch (error) {
-                    console.error("Error submitting vote:", error);
+                    console.error("Error al enviar voto:", error);
                     voteMessage.textContent = `Error al enviar voto: ${error.message}`;
                     voteMessage.classList.remove('text-green-600');
                     voteMessage.classList.add('text-red-600');
@@ -694,23 +399,8 @@
             font-family: 'Inter', sans-serif;
             background-color: #000; /* Fondo negro para el body */
             color: #333;
-            overflow-x: hidden; /* Prevent horizontal scrolling */
-            padding-top: 64px; /* Añadido padding al body para evitar que el contenido sea ocultado por el navbar fijo. Se ajustará dinámicamente con JS si la barra superior "Ahora Sonando" está visible. */
-        }
-
-        /* Top "Ahora Sonando" bar style */
-        #now-playing-top-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 101; /* Higher than navbar */
-            transition: all 0.3s ease-in-out;
-            transform: translateY(-100%); /* Start hidden above viewport */
-            /* Tailwind classes will manage visibility and positioning on show */
-        }
-        #now-playing-top-bar.active { /* Class added by JS when visible */
-            transform: translateY(0);
+            overflow-x: hidden; /* Evita el desplazamiento horizontal */
+            padding-top: 0px; /* Ya no es necesario que el body se encargue de este padding */
         }
 
         .container {
@@ -718,12 +408,13 @@
             overflow-x: hidden;
         }
         .header-bg {
-            /* Updated background image and added parallax effect */
+            /* Imagen de fondo actualizada y efecto de paralaje añadido */
             background-image: url('https://i.ibb.co/pBfr1P4c/Chat-GPT-Image-18-ago-2025-10-00-59-p-m.png');
             background-size: cover;
             background-position: center;
-            background-attachment: fixed; /* Esto crea el efecto parallax */
-            height: 400px;
+            background-attachment: fixed; /* Esto crea el efecto paralaje */
+            padding-top: 64px; /* Se añade el padding superior aquí, ya que el contenedor de logos ya no está. */
+            height: 400px; /* Mantener la altura para el efecto visual */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -739,7 +430,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.4); /* Dark overlay for text readability */
+            background: rgba(0, 0, 0, 0.4); /* Superposición oscura para la legibilidad del texto */
         }
         .header-content {
             z-index: 10;
@@ -747,8 +438,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100%; /* Ensure content takes full height to center items */
-            padding: 2rem 1rem; /* Increased padding top/bottom for more space */
+            height: 100%; /* Asegura que el contenido ocupe toda la altura para centrar los elementos */
+            padding: 2rem 1rem; /* Mayor padding superior/inferior para más espacio */
         }
         .header-content img {
             width: auto;
@@ -759,12 +450,12 @@
             display: block;
         }
         .navbar {
-            background-color: #2c2c2c; /* Dark charcoal */
-            position: fixed; /* Make navbar sticky */
-            top: 64px; /* Position below the top bar (if visible) or at 0 otherwise, adjusted by JS */
+            background-color: #2c2c2c; /* Carbón oscuro */
+            position: fixed; /* Hace que la barra de navegación sea fija */
+            top: 0px; /* Siempre en la parte superior */
             left: 0; /* Asegura que no haya espacio a la izquierda */
-            width: 100%; /* Full width */
-            z-index: 100; /* Ensure it stays above other content */
+            width: 100%; /* Ancho completo */
+            z-index: 100; /* Asegura que permanezca por encima de otro contenido */
             height: 64px; /* Altura explícita para la barra de navegación */
             display: flex; /* Para centrar elementos dentro del navbar */
             align-items: center; /* Centra verticalmente los elementos */
@@ -778,13 +469,12 @@
         }
         .nav-link {
             padding: 0.75rem 1rem; /* Padding ajustado para el envolvimiento */
-            color: #e0b97a; /* Gold/Copper accent */
-            transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for hover effects */
-            /* white-space: nowrap; REMOVED to allow wrapping */
+            color: #e0b97a; /* Acento oro/cobre */
+            transition: background-color 0.3s ease, color 0.3s ease; /* Transición suave para efectos hover */
         }
         .nav-link:hover {
-            background-color: #3a3a3a; /* Slightly lighter charcoal on hover */
-            color: #f7f3ed; /* Change text color to a soft cream on hover */
+            background-color: #3a3a3a; /* Carbón ligeramente más claro al pasar el ratón */
+            color: #f7f3ed; /* Cambia el color del texto a un crema suave al pasar el ratón */
         }
         .section {
             padding: 2rem 1rem;
@@ -837,16 +527,16 @@
             background-color: #3a3a3a;
         }
         .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
+            display: none; /* Oculto por defecto */
+            position: fixed; /* Permanece en su lugar */
+            z-index: 1000; /* Se superpone */
             left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.7); /* Black w/ opacity */
-            display: flex; /* Esto se sobreescribe cuando se muestra con JS */
+            width: 100%; /* Ancho completo */
+            height: 100%; /* Altura completa */
+            overflow: auto; /* Habilita el desplazamiento si es necesario */
+            background-color: rgba(0,0,0,0.7); /* Negro con opacidad */
+            display: flex; /* Esto se sobrescribe cuando se muestra con JS */
             align-items: center;
             justify-content: center;
         }
@@ -875,7 +565,7 @@
             text-decoration: none;
             cursor: pointer;
         }
-        /* Animations */
+        /* Animaciones */
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -888,7 +578,7 @@
         .animate-slideInUp { animation: slideInUp 0.6s ease-out; }
 
         .vote-option-btn {
-            background-color: #f0e6da; /* Lighter background for vote options */
+            background-color: #f0e6da; /* Fondo más claro para opciones de voto */
             color: #4a4a4a;
             padding: 0.75rem 1rem;
             border-radius: 0.5rem;
@@ -907,12 +597,12 @@
             transform: scale(1.02);
         }
 
-        /* WhatsApp floating button */
+        /* Botón flotante de WhatsApp */
         .whatsapp-float {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background-color: #25d366; /* WhatsApp green */
+            background-color: #25d366; /* Verde de WhatsApp */
             color: white;
             border-radius: 50%;
             width: 60px;
@@ -930,13 +620,13 @@
             background-color: #128c7e;
         }
 
-        /* Floating Survey Button */
+        /* Botón flotante de Encuesta */
         .survey-float {
             position: fixed;
             bottom: 20px;
             left: 20px;
-            background-color: #e0b97a; /* Gold/Copper accent */
-            color: #2c2c2c; /* Dark charcoal */
+            background-color: #e0b97a; /* Acento oro/cobre */
+            color: #2c2c2c; /* Carbón oscuro */
             border-radius: 50%;
             width: 60px;
             height: 60px;
@@ -963,8 +653,8 @@
             overflow: hidden;
             max-width: 100%;
             background: #000;
-            border-radius: 0.5rem; /* Rounded corners for video */
-            margin-top: 1.5rem; /* Space above video */
+            border-radius: 0.5rem; /* Esquinas redondeadas para video */
+            margin-top: 1.5rem; /* Espacio encima del video */
         }
 
         .video-container iframe {
@@ -975,7 +665,7 @@
             height: 100%;
         }
 
-        /* Nueva sección para el efecto parallax en la parte media */
+        /* Nueva sección para el efecto paralaje en la parte media */
         .middle-parallax-section {
             background-image: url('https://i.ibb.co/pBfr1P4c/Chat-GPT-Image-18-ago-2025-10-00-59-p-m.png');
             background-size: cover;
@@ -994,23 +684,23 @@
         }
 
 
-        /* Responsive adjustments */
+        /* Ajustes responsivos */
         @media (max-width: 768px) {
             body {
-                padding-top: 64px; /* Default padding for mobile, adjusted if top bar is active */
+                padding-top: 0px; /* Aseguramos que no haya padding en móvil tampoco */
             }
             .navbar {
-                top: 64px; /* Fixed position below a potential top bar */
+                top: 0px; /* Posición fija en la parte superior */
             }
             .navbar-menu {
                 display: none;
                 flex-direction: column;
                 width: 100%;
                 background-color: #2c2c2c;
-                position: absolute; /* Changed to absolute for mobile menu to slide down from fixed nav */
-                top: 64px; /* Height of the navbar */
+                position: absolute; /* Cambiado a absoluto para que el menú móvil se deslice desde la barra de navegación fija */
+                top: 64px; /* Altura de la barra de navegación */
                 left: 0;
-                z-index: 50; /* Z-index below the fixed navbar, but above page content */
+                z-index: 50; /* Z-index debajo de la barra de navegación fija, pero por encima del contenido de la página */
             }
             .navbar-menu.open {
                 display: flex;
@@ -1047,97 +737,21 @@
                 display: none;
             }
             .navbar-menu {
-                display: flex !important; /* Ensure it's always flex on larger screens */
+                display: flex !important; /* Asegura que siempre sea flex en pantallas grandes */
             }
+        }
+
+        /* Estilo para el contenedor principal del contenido para dejar espacio a la navbar fija */
+        #main-content {
+            padding-top: 0px; /* Ya no es necesario que el main-content tenga padding superior, el header-bg lo maneja. */
         }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- Login Form Container -->
-    <div id="login-form-container" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[200] hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full text-center">
-            <h2 class="text-3xl font-bold mb-6 text-gray-900">Acceso de Administrador</h2>
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <!-- MODIFICACIÓN AQUÍ: Valor por defecto para el correo del administrador -->
-                    <input type="email" id="admin-email" placeholder="Correo Electrónico" class="input-field" required value="dolceensamblenty@gmail.com">
-                </div>
-                <!-- Password input with toggle -->
-                <div class="relative">
-                    <input type="password" id="admin-password" placeholder="Contraseña" class="input-field pr-10" required value="password123">
-                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
-                        <i class="fas fa-eye cursor-pointer text-gray-500 hover:text-gray-700" id="toggle-password"></i>
-                    </span>
-                </div>
-                <button type="submit" class="btn-primary w-full">Iniciar Sesión</button>
-                <p id="login-message" class="mt-4 text-red-600"></p>
-            </form>
-        </div>
-    </div>
-
-    <!-- Admin Dashboard (Nuevo panel de administración de pantalla completa) -->
-    <div id="admin-dashboard" class="hidden bg-gray-900 text-white min-h-screen p-6 md:p-10">
-        <div class="max-w-4xl mx-auto">
-            <div class="flex flex-col md:flex-row justify-between items-center mb-8 pb-4 border-b border-gray-700">
-                <h2 class="text-4xl font-extrabold text-gold-400 mb-4 md:mb-0">Panel de Administración ⚙️</h2>
-                <div class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
-                    <p class="text-sm md:text-base">Admin: <span id="admin-email-display" class="font-semibold"></span></p>
-                    <button id="logout-button" class="btn-primary text-sm px-3 py-1 bg-red-600 hover:bg-red-700 w-full md:w-auto">Cerrar Sesión</button>
-                </div>
-            </div>
-
-            <!-- Sección para Añadir/Editar Canciones -->
-            <section class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
-                <h3 class="text-2xl font-bold mb-6 text-gold-300">Añadir/Editar Canción 🎵</h3>
-                <form id="add-song-form" class="space-y-4">
-                    <input type="hidden" id="song-id-to-edit"> <!-- Campo oculto para ID de canción a editar -->
-                    <div>
-                        <label for="song-title" class="block text-sm font-medium text-gray-300 mb-1">Título:</label>
-                        <input type="text" id="song-title" placeholder="Título de la Canción" class="input-field text-gray-900" required>
-                    </div>
-                    <div>
-                        <label for="song-description" class="block text-sm font-medium text-gray-300 mb-1">Descripción:</label>
-                        <textarea id="song-description" placeholder="Breve descripción de la canción" class="input-field text-gray-900 h-20" required></textarea>
-                    </div>
-                    <div>
-                        <label for="song-image-url" class="block text-sm font-medium text-gray-300 mb-1">URL de Imagen:</label>
-                        <input type="url" id="song-image-url" placeholder="URL de la imagen de la canción" class="input-field text-gray-900" required>
-                    </div>
-                    <button type="submit" id="add-song-button" class="btn-primary w-full text-center">Añadir</button>
-                    <p id="add-song-message" class="mt-4 text-center text-green-400 hidden"></p>
-                </form>
-            </section>
-
-            <!-- Sección de Lista de Canciones -->
-            <section class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
-                <h3 class="text-2xl font-bold mb-6 text-gold-300">Canciones Existentes</h3>
-                <div id="admin-songs-list" class="space-y-3 max-h-96 overflow-y-auto pr-2">
-                    <!-- Las canciones se cargarán aquí -->
-                    <p class="text-center text-gray-400">Cargando canciones...</p>
-                </div>
-            </section>
-
-            <!-- Sección de Comentarios de Invitados -->
-            <section class="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <h3 class="text-2xl font-bold mb-6 text-gold-300">Comentarios de Invitados 💬</h3>
-                <div id="admin-comments-list" class="space-y-3 max-h-96 overflow-y-auto pr-2">
-                    <!-- Los comentarios se cargarán aquí -->
-                    <p class="text-center text-gray-400">Cargando comentarios...</p>
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <!-- NEW: "Ahora Sonando" Top Bar -->
-    <div id="now-playing-top-bar" class="hidden">
-        <!-- Content dynamically loaded by JS -->
-    </div>
-
-
-    <!-- Main Content (Visible by default unless admin login form is active or admin dashboard is shown) -->
+    <!-- Contenido principal (Visible por defecto) -->
     <div id="main-content">
-        <!-- Navbar -->
+        <!-- Barra de navegación -->
         <nav class="navbar flex items-center relative z-50 justify-between md:justify-center">
             <button id="hamburger" class="text-white text-2xl focus:outline-none md:hidden">
                 <i class="fas fa-bars"></i>
@@ -1153,7 +767,7 @@
             </div>
         </nav>
 
-        <!-- Header Section -->
+        <!-- Sección de Encabezado -->
         <header class="header-bg relative">
             <div class="header-content p-4 animate-fadeIn">
                 <!-- Logo del proyecto -->
@@ -1163,11 +777,7 @@
             </div>
         </header>
 
-        <!-- The 'current-song-display' section is removed from here as per user request -->
-        <!-- Its functionality is replaced by #now-playing-top-bar and #song-details-page -->
-
-
-        <!-- Participate Section -->
+        <!-- Sección de Participación -->
         <section id="participa" class="section animate-slideInUp">
             <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Participa en el Concierto ✨</h2>
             <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
@@ -1183,89 +793,101 @@
                 <p id="voteMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Gracias por tu voto! 🎉</p>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-lg">
-                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Comparte tu Experiencia 💖</h3>
-                <p class="mb-4 text-gray-700">¿Cómo te hace sentir la música? ¿Qué emociones evoca? Comparte tus comentarios y experiencias relacionadas con la temática del concierto. (Tus comentarios se leerán anónimamente)</p>
-                <textarea id="commentInput" class="input-field mb-4 h-32" placeholder="Escribe tu comentario aquí..."></textarea>
-                <button id="submitCommentBtn" class="btn-primary w-full text-center">Enviar Comentario</button>
-                <p id="commentMessage" class="mt-4 text-center text-green-600 font-semibold hidden">¡Comentario enviado! Gracias por compartir. ✨</p>
-                <div class="mt-6 flex justify-center space-x-4">
-                    <button class="social-share-btn" onclick="shareOnSocial('facebook')"><i class="fab fa-facebook-f"></i></button>
-                    <button class="social-share-btn" onclick="shareOnSocial('twitter')"><i class="fab fa-twitter"></i></i
->                    <button class="social-share-btn" onclick="shareOnSocial('instagram')"><i class="fab fa-instagram"></i></button>
+            <!-- Nueva sección "¡Ahora Sonando!" -->
+            <div id="now-playing-section" class="bg-white p-6 rounded-xl shadow-lg mt-8">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800 text-center">¡Ahora Sonando! 🎶</h3>
+                <div id="current-song-info" class="text-center text-gray-700">
+                    <p>Cargando información de la canción...</p>
                 </div>
+                <button id="viewSongDetailsBtn" class="btn-primary w-full text-center mt-6 hidden">Ver Detalles ▶️</button>
             </div>
         </section>
 
-        <!-- Middle Parallax Section -->
+        <!-- Sección de Paralaje Central -->
         <section class="middle-parallax-section">
             "Donde cada nota cuenta una historia."
         </section>
 
-        <!-- Musicians Section -->
+        <!-- Sección de Músicos -->
         <section id="musicos" class="section animate-slideInUp">
             <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Nuestros Músicos & Narradora 🎻</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Narradora - Siempre la primera -->
+                <!-- Narradora -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/vCdB7QZZ/cinthia.jpg" alt="Narradora Cinthia" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Cinthia Garza</h3>
+                    <img src="https://i.ibb.co/vCdB7QZZ/cinthia.jpg" alt="Cinthia" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Cinthia</h3>
                     <p class="text-gray-600 mb-4">Narradora principal. Con su cautivadora voz, Cinthia te transportará a cada escena, haciendo que cada relato cobre vida. 🗣️</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Cinthia Garza', 'Narradora principal.')"><i class="fas fa-share-alt"></i></button>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-cinthia')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
                 <!-- Cantante -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/HpVvkyZ7/Caro.jpg" alt="Cantante" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Carolina "Caro" Solís</h3>
+                    <img src="https://i.ibb.co/HpVvkyZ7/Caro.jpg" alt="Carolina" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Carolina</h3>
                     <p class="text-gray-600 mb-4">Cantante principal. Su voz, una mezcla de dulzura y poder, te guiará a través de cada historia.🎤</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Carolina Solís', 'Cantante principal.')"><i class="fas fa-share-alt"></i></button>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-carolina')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
                 <!-- Saxofonista -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/0jBQBB0c/sax-azael.jpg" alt="Saxofonista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Antonio "Aza" Zazueta</h3>
-                    <p class="text-gray-600 mb-4">Saxofonista principal. Con su sax, Aza añade un toque de sensualidad y sofisticación a cada pieza. 🎷</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Antonio Zazueta', 'Saxofonista principal.')"><i class="fas fa-share-alt"></i></button>
+                    <img src="https://i.ibb.co/0jBQBB0c/sax-azael.jpg" alt="Azael" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Azael</h3>
+                    <p class="text-gray-600 mb-4">Saxofonista principal. Con su sax, Azael añade un toque de sensualidad y sofisticación a cada pieza. 🎷</p>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-azael')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
                 <!-- Arpista -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/VcCQYbDp/ariadna-ari-arpista.jpg" alt="Arpista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Ariadna "Ari" Gómez</h3>
+                    <img src="https://i.ibb.co/VcCQYbDp/ariadna-ari-arpista.jpg" alt="Ariadna" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Ariadna</h3>
                     <p class="text-gray-600 mb-4">Arpista, sus melodías etéreas transportan a un mundo de ensueño y magia.💫</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Ariadna Gómez', 'Arpista.')"><i class="fas fa-share-alt"></i></button>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-ariadna')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
                 <!-- Violinista -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/7JMYCWVw/414867486-10232565539508056-4641127466506244359-n.jpg" alt="Violinista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Ricardo "Rola" Martínez</h3>
-                    <p class="text-gray-600 mb-4">Violinista principal y arreglista. Con su pasión, Rola teje melodías que tocan el alma, explorando desde lo clásico hasta lo contemporáneo. 🌟</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Ricardo Martínez', 'Violinista principal y arreglista.')"><i class="fas fa-share-alt"></i></button>
+                    <img src="https://i.ibb.co/7JMYCWVw/414867486-10232565539508056-4641127466506244359-n.jpg" alt="Rolando" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Rolando</h3>
+                    <p class="text-gray-600 mb-4">Violinista principal y arreglista. Con su pasión, Rolando teje melodías que tocan el alma, explorando desde lo clásico hasta lo contemporáneo. 🌟</p>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-rolando')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
                 <!-- Percusionista -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/YBtkYswp/percusionista.jpg" alt="Percusionista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Jonathan "Johny" Pérez</h3>
-                    <p class="text-gray-600 mb-4">Percusionista, el ritmo y la energía de Johny hacen vibrar cada rincón del escenario. 🥁</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Jonathan Pérez', 'Percusionista.')"><i class="fas fa-share-alt"></i></button>
+                    <img src="https://i.ibb.co/YBtkYswp/percusionista.jpg" alt="Jonathan" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Jonathan</h3>
+                    <p class="text-gray-600 mb-4">Percusionista, el ritmo y la energía de Jonathan hacen vibrar cada rincón del escenario. 🥁</p>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-jonathan')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
                 <!-- Pianista -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/tMzCC7dz/pianista.jpg" alt="Pianista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Fernando "Fer" García</h3>
-                    <p class="text-gray-600 mb-4">Pianista y compositor. Las manos de Fer crean atmósferas mágicas que te sumergen en cada emoción. 🎹</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Fernando García', 'Pianista y compositor.')"><i class="fas fa-share-alt"></i></button>
+                    <img src="https://i.ibb.co/tMzCC7dz/pianista.jpg" alt="Fernando" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Fernando</h3>
+                    <p class="text-gray-600 mb-4">Pianista y compositor. Las manos de Fernando crean atmósferas mágicas que te sumergen en cada emoción. 🎹</p>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-fernando')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
                 <!-- Chelista -->
                 <div class="card p-6 text-center">
-                    <img src="https://i.ibb.co/C5jHH4jy/marcello.jpg" alt="Chelista" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
-                    <h3 class="text-xl font-semibold mb-2">Marcelo "Marcello" Ríos</h3>
+                    <img src="https://i.ibb.co/C5jHH4jy/marcello.jpg" alt="Marcello" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover">
+                    <h3 class="text-xl font-semibold mb-2">Marcello</h3>
                     <p class="text-gray-600 mb-4">Chelista, su cello aporta una profundidad y calidez inigualable al ensamble.🎶</p>
-                    <button class="social-share-btn mx-auto" onclick="shareMusician('Marcelo Ríos', 'Chelista.')"><i class="fas fa-share-alt"></i></button>
+                    <button class="btn-primary mx-auto flex items-center justify-center gap-2" onclick="openMusicianVideo('https://youtu.be/E5mmd7eRJ14?si=video-marcello')" target="_blank">
+                        Ver Video <i class="fas fa-play"></i>
+                    </button>
                 </div>
             </div>
         </section>
 
-        <!-- Upcoming Events Section -->
+        <!-- Sección de Próximos Eventos -->
         <section id="eventos" class="section animate-slideInUp">
             <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Próximos Eventos y Boletos 🎟️</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1288,7 +910,29 @@
             </div>
         </section>
 
-        <!-- Photo Gallery Section -->
+        <!-- Sección de Restaurante Cornalina -->
+        <section id="restaurante" class="section animate-slideInUp">
+            <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Restaurante Cornalina 🍽️</h2>
+            <div class="bg-white p-6 rounded-xl shadow-lg text-center">
+                <!-- Imagen de Fachada Cornalina anterior -->
+                <img src="https://placehold.co/600x300/e0b97a/2c2c2c?text=Fachada+Cornalina" alt="Fachada Restaurante Cornalina" class="rounded-lg shadow-md w-full h-auto object-cover mb-6">
+                <p class="text-gray-700 mb-4">Descubre Cornalina, una joya culinaria en Monterrey que te transportará a una auténtica experiencia gastronómica británica. El lugar perfecto para disfrutar de una velada inolvidable con excelente comida y, por supuesto, la música de La Mesa Acústica.</p>
+                <div class="text-left mb-6 inline-block">
+                    <p class="text-gray-800 font-semibold text-lg mb-2"><i class="fas fa-map-marker-alt mr-2 text-gold-600"></i> Dirección: Av. Lázaro Cárdenas 2400, Residencial San Agustín, San Pedro Garza García, N.L.</p>
+                    <p class="text-gray-800 font-semibold text-lg mb-2"><i class="fas fa-phone mr-2 text-gold-600"></i> Teléfono: +52 81 1234 5678</p>
+                    <p class="text-gray-800 font-semibold text-lg mb-2"><i class="fas fa-globe mr-2 text-gold-600"></i> Sitio Web: <a href="https://www.ejemplocornalina.com" target="_blank" class="text-blue-600 hover:underline">www.ejemplocornalina.com</a></p>
+                </div>
+                <h4 class="text-xl font-semibold mb-4 text-gray-800">Síguenos en Redes Sociales:</h4>
+                <div class="flex justify-center space-x-4">
+                    <a href="https://www.instagram.com/cornalinamx/" target="_blank" class="social-share-btn"><i class="fab fa-instagram"></i></a>
+                    <a href="https://www.facebook.com/CornalinaMx" target="_blank" class="social-share-btn"><i class="fab fa-facebook-f"></i></a>
+                    <a href="https://www.tiktok.com/@cornalinamx" target="_blank" class="social-share-btn"><i class="fab fa-tiktok"></i></a>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Sección de Galería de Fotos -->
         <section id="galeria" class="section animate-slideInUp">
             <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Galería de Momentos 📸</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1301,11 +945,11 @@
             </div>
         </section>
 
-        <!-- Past Comments Section -->
+        <!-- Sección de Comentarios Anteriores -->
         <section id="comentarios" class="section animate-slideInUp">
             <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Lo que Dicen Nuestros Invitados 💬</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Comment 1 -->
+                <!-- Comentario 1 -->
                 <div class="card p-6">
                     <div class="flex items-center mb-4">
                         <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=JP" alt="Comensal JP" class="w-12 h-12 rounded-full mr-4 object-cover">
@@ -1316,7 +960,7 @@
                     </div>
                     <p class="text-gray-700">"Una experiencia mágica. La música en vivo y la comida crearon una atmósfera inolvidable. ¡Volveremos pronto!" ✨</p>
                 </div>
-                <!-- Comment 2 -->
+                <!-- Comentario 2 -->
                 <div class="card p-6">
                     <div class="flex items-center mb-4">
                         <img src="https://placehold.co/60x60/e0b97a/2c2c2c?text=AM" alt="Comensal AM" class="w-12 h-12 rounded-full mr-4 object-cover">
@@ -1330,7 +974,7 @@
             </div>
         </section>
 
-        <!-- Contact Section -->
+        <!-- Sección de Contacto -->
         <section id="contacto" class="section animate-slideInUp">
             <h2 class="text-4xl font-bold text-center mb-8 text-gray-900">Contacto Dolce Ensamble 📞</h2>
             <div class="bg-white p-6 rounded-xl shadow-lg text-center">
@@ -1342,7 +986,7 @@
                     <a href="https://www.facebook.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-facebook-f"></i></a>
                     <a href="https://www.youtube.com/dolceensamble" target="_blank" class="social-share-btn"><i class="fab fa-youtube"></i></a>
                 </div>
-                <!-- YouTube Video Embed -->
+                <!-- Inserción de video de YouTube -->
                 <div class="video-container mt-6">
                     <iframe
                         src="https://www.youtube.com/embed/E5mmd7eRJ14"
@@ -1354,7 +998,7 @@
             </div>
         </section>
 
-        <!-- Satisfaction Survey Modal -->
+        <!-- Modal de Encuesta de Satisfacción -->
         <div id="satisfactionModal" class="modal">
             <div class="modal-content text-center">
                 <span class="close-button" onclick="closeModal()">&times;</span>
@@ -1364,21 +1008,21 @@
             </div>
         </div>
 
-        <!-- WhatsApp Floating Button -->
+        <!-- Botón flotante de WhatsApp -->
         <a href="https://wa.me/528110474854" class="whatsapp-float" target="_blank">
             <i class="fab fa-whatsapp"></i>
         </a>
 
-        <!-- Floating Survey Button -->
+        <!-- Botón flotante de Encuesta -->
         <button id="floatingSurveyBtn" class="survey-float">
             <i class="fas fa-clipboard-list"></i>
         </button>
-    </div> <!-- End of main-content -->
+    </div> <!-- Fin del main-content -->
 
-    <!-- Song Details Page (New Section for Public View) -->
+    <!-- Página de Detalles de la Canción (Nueva Sección para Vista Pública) -->
     <div id="song-details-page" class="hidden min-h-screen bg-gray-100 p-6 md:p-10 flex flex-col justify-center items-center text-center">
         <div id="song-details-content" class="w-full">
-            <!-- Song details will be loaded here dynamically -->
+            <!-- Los detalles de la canción se cargarán aquí dinámicamente -->
             <p class="text-gray-600">Cargando detalles de la canción...</p>
         </div>
     </div>
